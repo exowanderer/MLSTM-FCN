@@ -29,10 +29,17 @@ def load_dataset_at(index, fold_index=None, normalize_timeseries=False, verbose=
         X_test = np.load(x_test_path)
         y_test = np.load(y_test_path)
     elif os.path.exists(x_train_path[1:]):
+        # Relative instead of absolute path
         X_train = np.load(x_train_path[1:])
         y_train = np.load(y_train_path[1:])
         X_test = np.load(x_test_path[1:])
         y_test = np.load(y_test_path[1:])
+    elif os.path.exists(x_train_path.replace('../','')):
+        # current directory
+        X_train = np.load(x_train_path.replace('../',''))
+        y_train = np.load(y_train_path.replace('../',''))
+        X_test = np.load(x_test_path.replace('../',''))
+        y_test = np.load(y_test_path.replace('../',''))
     else:
         raise FileNotFoundError('File %s not found!' % (TRAIN_FILES[index]))
 
