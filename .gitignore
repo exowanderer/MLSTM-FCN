@@ -10,4 +10,4 @@ data/CCVdataset/*.txt
 weights/*.h5
 weights/*/*.h5
 .idea/
-utils/*.pyc
+utils/*.pyc__pycache__

@@ -86,7 +86,7 @@ class MLSTM_FCN(object):
 										squeeze_ratio=squeeze_ratio, 
 										activation_func=activation_func, 
 										logit_output=logit_output, 
-										kernel_initializer=squeeze_initializer, 
+										kernel_initializer=squeeze_initializer,
 										use_bias=use_bias)
 		
 		conv1d_tower = Conv1D(conv1d_depths[1], conv1d_kernels[1],
@@ -99,7 +99,7 @@ class MLSTM_FCN(object):
 										squeeze_ratio=squeeze_ratio, 
 										activation_func=activation_func, 
 										logit_output=logit_output, 
-										kernel_initializer=squeeze_initializer, 
+										kernel_initializer=squeeze_initializer,
 										use_bias=use_bias)
 		
 		conv1d_tower = Conv1D(conv1d_depths[2], conv1d_kernels[2],
@@ -118,4 +118,24 @@ class MLSTM_FCN(object):
 		self.model.summary()
 		
 		# add load model code ere to fine-tune
-	
+
+
+if __name__ == "__main__":
+    # Model 1
+    instance1 = MLSTM_FCN(DATASET_INDEX=27)
+    instance1.create_model()
+
+    # Model 2
+    instance2 = MLSTM_FCN(DATASET_INDEX=27)
+    instance2.create_model(Attention=True)
+    
+    # Model 3
+    instance3 = MLSTM_FCN(DATASET_INDEX=27)
+    instance3.create_model(Squeeze=False)
+    
+    # Model 4
+    instance4 = MLSTM_FCN(DATASET_INDEX=27)
+    instance4.create_model(Attention=True, Squeeze=False)
+    
+    train_model(instance1.model, DATASET_INDEX, dataset_prefix='arabic_voice_', epochs=1000, batch_size=128)
+    evaluate_model(instance1.model, DATASET_INDEX, dataset_prefix='arabic_voice_', batch_size=128)
