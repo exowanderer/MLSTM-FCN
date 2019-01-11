@@ -1,7 +1,7 @@
 from keras.models import Model
 from keras.layers import Input, Dense, LSTM, Activation, Masking, Reshape
 from keras.layers import multiply, concatenate
-from keras.layers import Conv1D, BatchNormalization, GlobalAveragePooling1D, 
+from keras.layers import Conv1D, BatchNormalization, GlobalAveragePooling1D
 from keras.layers import Permute, Dropout
 
 from utils.constants import MAX_NB_VARIABLES, NB_CLASSES_LIST, MAX_TIMESTEPS_LIST
@@ -42,18 +42,18 @@ def squeeze_excite_block(tower,
 class MLSTM_FCN(object):
 	def __init__(self, DATASET_INDEX=None, TRAINABLE=True):
 
-		MAX_TIMESTEPS = MAX_TIMESTEPS_LIST[DATASET_INDEX]
-		MAX_NB_VARIABLES = MAX_NB_VARIABLES[DATASET_INDEX]
+		num_max_times = MAX_TIMESTEPS_LIST[DATASET_INDEX]
+		num_max_var = MAX_NB_VARIABLES[DATASET_INDEX]
 		
 		self.num_classes = NB_CLASSES_LIST[DATASET_INDEX]
 
-		self.input_shape = (MAX_NB_VARIABLES, MAX_TIMESTEPS)
+		self.input_shape = (num_max_var, num_max_times)
 
 	def create_model(self, 
 					 n_lstm_cells = 8, 
 					 dropout_rate = 0.8, 
 					 permute_dims = (2,1), 
-					 conv1d_depths = [128. 256, 128], 
+					 conv1d_depths = [128, 256, 128], 
 					 conv1d_kernels = [8, 5, 3], 
 					 local_initializer = 'he_uniform', 
 					 activation_func = 'relu', 
@@ -66,7 +66,7 @@ class MLSTM_FCN(object):
 
 		input_layer = Input(shape=self.input_shape)
 
-		rnn_tower = Masking()(ip)
+		rnn_tower = Masking()(input_layer)
 		if Attention:
 			rnn_tower = AttentionLSTM(n_lstm_cells)(rnn_tower)
 		else:
@@ -74,7 +74,7 @@ class MLSTM_FCN(object):
 
 		rnn_tower = Dropout(dropout_rate)(rnn_tower)
 
-		conv1d_tower = Permute(permute_dims)(ip)
+		conv1d_tower = Permute(permute_dims)(input_layer)
 
 		conv1d_tower = Conv1D(conv1d_depths[0], conv1d_kernels[0],
 							kernel_initializer=local_initializer)(conv1d_tower)
@@ -125,7 +125,7 @@ if __name__ == "__main__":
 	arabic_voice_settings = dict(n_lstm_cells = 8, 
 								 dropout_rate = 0.8, 
 								 permute_dims = (2,1), 
-								 conv1d_depths = [128. 256, 128], 
+								 conv1d_depths = [128, 256, 128], 
 								 conv1d_kernels = [8, 5, 3], 
 								 local_initializer = 'he_uniform', 
 								 activation_func = 'relu', 
