@@ -121,21 +121,36 @@ class MLSTM_FCN(object):
 
 
 if __name__ == "__main__":
+
+	arabic_voice_settings = dict(n_lstm_cells = 8, 
+								 dropout_rate = 0.8, 
+								 permute_dims = (2,1), 
+								 conv1d_depths = [128. 256, 128], 
+								 conv1d_kernels = [8, 5, 3], 
+								 local_initializer = 'he_uniform', 
+								 activation_func = 'relu', 
+								 squeeze_ratio = 16, 
+			 					 Attention = False, 
+			 					 Squeeze = True, 
+								 logit_output = 'sigmoid', 
+								 squeeze_initializer = 'he_normal', 
+								 use_bias = False)
+
     # Model 1
     instance1 = MLSTM_FCN(DATASET_INDEX=27)
-    instance1.create_model()
+    instance1.create_model(**arabic_voice_settings)
 
     # Model 2
     instance2 = MLSTM_FCN(DATASET_INDEX=27)
-    instance2.create_model(Attention=True)
+    instance2.create_model(Attention=True, **arabic_voice_settings)
     
     # Model 3
-    instance3 = MLSTM_FCN(DATASET_INDEX=27)
-    instance3.create_model(Squeeze=False)
+    instance3 = MLSTM_FCN(DATASET_INDEX=27, **arabic_voice_settings)
+    instance3.create_model(Squeeze=False, **arabic_voice_settings)
     
     # Model 4
     instance4 = MLSTM_FCN(DATASET_INDEX=27)
-    instance4.create_model(Attention=True, Squeeze=False)
+    instance4.create_model(Attention=True, Squeeze=False, **arabic_voice_settings)
     
     train_model(instance1.model, DATASET_INDEX, dataset_prefix='arabic_voice_', epochs=1000, batch_size=128)
     evaluate_model(instance1.model, DATASET_INDEX, dataset_prefix='arabic_voice_', batch_size=128)
