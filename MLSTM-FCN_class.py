@@ -8,6 +8,21 @@ from utils.constants import MAX_NB_VARIABLES, NB_CLASSES_LIST, MAX_TIMESTEPS_LIS
 from utils.keras_utils import train_model, evaluate_model, set_trainable
 from utils.layer_utils import AttentionLSTM
 
+import warnings
+warnings.simplefilter('ignore', category=DeprecationWarning)
+
+def Conv1D_Stack(input_stack, conv1d_depth, conv1d_kernel, 
+				activation_func, local_initializer):
+	
+	output_stack = Conv1D(conv1d_depth, conv1d_kernel,
+						kernel_initializer=local_initializer)(input_stack)
+
+	output_stack = BatchNormalization()(output_stack)
+	
+	output_stack = Activation(activation_func)(output_stack)
+
+	return output_stack
+
 def squeeze_excite_block(tower, 
 						 squeeze_ratio = 16, 
 						 activation_func = 'relu',
@@ -57,16 +72,17 @@ class MLSTM_FCN(object):
 					 conv1d_kernels = [8, 5, 3], 
 					 local_initializer = 'he_uniform', 
 					 activation_func = 'relu', 
-					 squeeze_ratio = 16, 
- 					 Attention = False, 
+					 Attention = False, 
  					 Squeeze = True, 
+					 squeeze_ratio = 16, 
+ 					 squeeze_initializer = 'he_normal', 
 					 logit_output = 'sigmoid', 
-					 squeeze_initializer = 'he_normal', 
 					 use_bias = False):
 
 		input_layer = Input(shape=self.input_shape)
 
 		rnn_tower = Masking()(input_layer)
+		
 		if Attention:
 			rnn_tower = AttentionLSTM(n_lstm_cells)(rnn_tower)
 		else:
@@ -76,23 +92,15 @@ class MLSTM_FCN(object):
 
 		conv1d_tower = Permute(permute_dims)(input_layer)
 
-		conv1d_tower = Conv1D(conv1d_depths[0], conv1d_kernels[0],
-							kernel_initializer=local_initializer)(conv1d_tower)
-		conv1d_tower = BatchNormalization()(conv1d_tower)
-		conv1d_tower = Activation(activation_func)(conv1d_tower)
-		
-		if Squeeze:
-			conv1d_tower = squeeze_excite_block(conv1d_tower, 
-										squeeze_ratio=squeeze_ratio, 
-										activation_func=activation_func, 
-										logit_output=logit_output, 
-										kernel_initializer=squeeze_initializer,
-										use_bias=use_bias)
-		
-		conv1d_tower = Conv1D(conv1d_depths[1], conv1d_kernels[1],
-							kernel_initializer=local_initializer)(conv1d_tower)
-		conv1d_tower = BatchNormalization()(conv1d_tower)
-		conv1d_tower = Activation(activation_func)(conv1d_tower)
+		# conv1d_tower = Conv1D(conv1d_depths[0], conv1d_kernels[0],
+		# 					kernel_initializer=local_initializer)(conv1d_tower)
+		# conv1d_tower = BatchNormalization()(conv1d_tower)
+		# conv1d_tower = Activation(activation_func)(conv1d_tower)
+		conv1d_tower = Conv1D_Stack(conv1d_tower, 
+									conv1d_depth = conv1d_depths[0], 
+									conv1d_kernel = conv1d_kernels[0], 
+									activation_func = activation_func, 
+									local_initializer = local_initializer) 
 
 		if Squeeze:
 			conv1d_tower = squeeze_excite_block(conv1d_tower, 
@@ -102,10 +110,33 @@ class MLSTM_FCN(object):
 										kernel_initializer=squeeze_initializer,
 										use_bias=use_bias)
 		
-		conv1d_tower = Conv1D(conv1d_depths[2], conv1d_kernels[2],
-							kernel_initializer=local_initializer)(conv1d_tower)
-		conv1d_tower = BatchNormalization()(conv1d_tower)
-		conv1d_tower = Activation(activation_func)(conv1d_tower)
+		# conv1d_tower = Conv1D(conv1d_depths[1], conv1d_kernels[1],
+		# 					kernel_initializer=local_initializer)(conv1d_tower)
+		# conv1d_tower = BatchNormalization()(conv1d_tower)
+		# conv1d_tower = Activation(activation_func)(conv1d_tower)
+		conv1d_tower = Conv1D_Stack(conv1d_tower, 
+									conv1d_depth = conv1d_depths[1], 
+									conv1d_kernel = conv1d_kernels[1], 
+									activation_func = activation_func, 
+									local_initializer = local_initializer) 
+		
+		if Squeeze:
+			conv1d_tower = squeeze_excite_block(conv1d_tower, 
+										squeeze_ratio=squeeze_ratio, 
+										activation_func=activation_func, 
+										logit_output=logit_output, 
+										kernel_initializer=squeeze_initializer,
+										use_bias=use_bias)
+		
+		# conv1d_tower = Conv1D(conv1d_depths[2], conv1d_kernels[2],
+		# 					kernel_initializer=local_initializer)(conv1d_tower)
+		# conv1d_tower = BatchNormalization()(conv1d_tower)
+		# conv1d_tower = Activation(activation_func)(conv1d_tower)
+		conv1d_tower = Conv1D_Stack(conv1d_tower, 
+									conv1d_depth = conv1d_depths[2], 
+									conv1d_kernel = conv1d_kernels[2], 
+									activation_func = activation_func, 
+									local_initializer = local_initializer) 
 
 		conv1d_tower = GlobalAveragePooling1D()(conv1d_tower)
 
@@ -130,12 +161,11 @@ if __name__ == "__main__":
 								 local_initializer = 'he_uniform', 
 								 activation_func = 'relu', 
 								 squeeze_ratio = 16, 
-			 					 Attention = False, 
-			 					 Squeeze = True, 
 								 logit_output = 'sigmoid', 
 								 squeeze_initializer = 'he_normal', 
 								 use_bias = False)
-
+			 					 # Attention = False, 
+			 					 # Squeeze = True, 
     # Model 1
     instance1 = MLSTM_FCN(DATASET_INDEX=27)
     instance1.create_model(**arabic_voice_settings)
