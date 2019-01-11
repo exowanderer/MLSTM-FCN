@@ -114,6 +114,8 @@ class MLSTM_FCN(object):
 
 		self.input_shape = (num_max_var, num_max_times)
 
+		self.trained_ = False
+
 	def create_model(self, 
 					 n_lstm_cells = 8, 
 					 dropout_rate = 0.8, 
@@ -195,7 +197,7 @@ class MLSTM_FCN(object):
 		
 		# add load model code ere to fine-tune
 
-	def load_dataset(load_train_filename, load_test_filename, feature_columns=[], 
+	def load_dataset(load_train_filename, load_test_filename,
 						is_timeseries = True, normalize_timeseries=False, 
 						x_tol = 1e-8, verbose = True) -> (np.array, np.array):
 
@@ -256,6 +258,8 @@ class MLSTM_FCN(object):
 						use_tensorboard=True, loss='categorical_crossentropy', 
 						metrics=['accuracy']):
 
+		self.learning_rate = 1e-3
+
 	    self._classes = np.unique(self.y_train)
 	    self._lbl_enc = LabelEncoder()
 	    
@@ -309,14 +313,14 @@ class MLSTM_FCN(object):
 
 			callback_list.append(early_stopping)
 
-	    if optimizer is None: optimizer = Adam(lr=learning_rate)
+	    if optimizer is None: optimizer = Adam(lr=self.learning_rate)
 
 	    if compile_model:
 	        model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
 
 	    if val_subset is not None:
 	    	# This removes 20% of the data to be ignored until after training
-	    	#	should be done before this step; but it's here for completeness.
+	    	#	should be done before this step; but it's here for completeness
 	    	idx_test, idx_val = train_test_split(np.arange(y_test), test_size=0.2)
 	        X_test = X_test[idx_test]
 	        y_test = y_test[idx_test]
@@ -324,27 +328,17 @@ class MLSTM_FCN(object):
 	    model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, callbacks=callback_list,
 	              class_weight=class_weight, verbose=2, validation_data=(X_test, y_test))
 
-	def evaluate_model(self, test_data_subset=None, cutoff=None, dataset_fold_id=None):
+	   	self.trained_ = True
+
+	def evaluate_model(self, optimizer=None, test_data_subset=None, cutoff=None, dataset_fold_id=None):
 		
-	    # if max_nb_features != MAX_NB_VARIABLES[dataset_id]:
-	    #     if cutoff is None:
-	    #         choice = cutoff_choice(dataset_id, max_nb_features)
-	    #     else:
-	    #         assert cutoff in ['pre', 'post'], 'Cutoff parameter value must be either "pre" or "post"'
-	    #         choice = cutoff
+		assert(self.trained), "Cann evaluate a model that has not been trained"
 
-	    #     if choice not in ['pre', 'post']:
-	    #         return
-	    #     else:
-	    #         _, X_test = cutoff_sequence(None, X_test, choice, dataset_id, max_nb_features)
+	    self.y_test = to_categorical(self.y_test, len(np.unique(self.y_test)))
 
-	    # if not is_timeseries:
-	    #     X_test = pad_sequences(X_test, maxlen=MAX_NB_VARIABLES[dataset_id], padding='post', truncating='post')
-
-	    y_test = to_categorical(y_test, len(np.unique(y_test)))
-
-	    optm = Adam(lr=1e-3)
-	    model.compile(optimizer=optm, loss='categorical_crossentropy', metrics=['accuracy'])
+	    optimizer = optimizer or Adam(lr=self.learning_rate)
+	    model.compile(	optimizer=optimizer, 
+	    				loss='categorical_crossentropy', metrics=['accuracy'])
 
 	    if dataset_fold_id is None:
 	        self.weight_fn = "./weights/{}_weights.h5".format(dataset_prefix)
@@ -361,6 +355,12 @@ class MLSTM_FCN(object):
 	    loss, accuracy = model.evaluate(X_test, y_test, batch_size=batch_size)
 	    print()
 	    print("Final Accuracy : ", accuracy)
+
+	def save_model(self, save_filename):
+		joblib.dump(self, save_filename)
+
+	def load_model(self, load_filename):
+		self.__dict__ = joblib.load(load_filename).__dict__ 
 
 if __name__ == "__main__":
 
@@ -381,16 +381,12 @@ if __name__ == "__main__":
 			 				# Attention = False, # Default
 			 				# Squeeze = True,  # Default
 	
-	normalize_timeseries = True
-
-	X_train, y_train, X_test, y_test, is_timeseries = load_dataset_at(load_data_filename, 
-                                                        normalize_timeseries=normalize_timeseries)
-
 	# Model 1
 	instance1 = MLSTM_FCN(DATASET_INDEX=DATASET_INDEX)
 
 	instance1.create_model(**dataset_settings)
-	instance1.load_dataset()
+	instance1.load_dataset(load_train_filename, load_test_filename, normalize_timeseries=True)
+
 	instance1.train_model(epochs=1000, batch_size=128)
 	instance1.evaluate_model(batch_size=128)
 	
