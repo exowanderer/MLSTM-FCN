@@ -1,8 +1,13 @@
+import os
+import tensorflow as tf
+
 from keras.models import Model
 from keras.layers import Input, Dense, LSTM, Activation, Masking, Reshape
 from keras.layers import multiply, concatenate
 from keras.layers import Conv1D, BatchNormalization, GlobalAveragePooling1D
 from keras.layers import Permute, Dropout
+
+from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, TensorBoard, EarlyStopping
 
 from utils.constants import MAX_NB_VARIABLES, NB_CLASSES_LIST, MAX_TIMESTEPS_LIST
 from utils.keras_utils import train_model, evaluate_model, set_trainable
@@ -12,6 +17,49 @@ from sklearn.externals import joblib
 
 import warnings
 warnings.simplefilter('ignore', category=DeprecationWarning)
+
+class TrainValTensorboard(TensorBoard):
+	def __init__(self, log_dir='./logs', **kwargs):
+		
+		self.log_dir = log_dir
+
+		# Make the original `TensorBoard` log to a subdirectory 'training'
+		self.training_log_dir = os.path.join(self.log_dir, 'training')
+		super(TrainValTensorboard, self).__init__(self.training_log_dir, **kwargs)
+
+		# Log the validation metrics to a separate subdirectory
+		self.val_log_dir = os.path.join(log_dir, 'validation')
+
+	def set_model(self, model):
+		self.val_writer = tf.summary.FileWriter(self.val_log_dir)
+		super(TrainValTensorboard, self).set_model(model)
+
+	def on_epoch_end(self, epoch, logs=None):
+		# Pop the validation logs and handle them separately with 
+		#	`self.val_writer`. Also rename the keys so that they can
+		#	be plotted on the same figure with the training metrics
+		logs = logs or {}
+		val_logs = {k.replace('val_', ''): v for k, v in logs.items() \
+												if k.startswith('val_')}
+
+		for name, value in val_logs.items():
+			summary = tf.Summary()
+			summary_value = summary.value.add()
+			summary_value.simple_value = value.item()
+			summary_value.tag = name
+			self.val_writer.add_summary(summary, epoch)
+
+		self.val_writer.flush()
+
+		# Pass the remaining logs to `Tensorboard.on_epoch_end`
+		logs = {k:v for k,v in logs.items() if not k.startswith('val_')}
+
+		super(TrainValTensorboard, self).on_epoch_end(epoch, logs)
+
+	def on_train_end(self, logs=None):
+		super(TrainValTensorboard, self).on_train_end(logs)
+		self.val_writer.close()
+
 
 def Conv1D_Stack(input_stack, conv1d_depth, conv1d_kernel, 
 				activation_func, local_initializer):
@@ -169,7 +217,7 @@ class MLSTM_FCN(object):
 	    self.X_train, self.y_train = joblib.load(self.load_train_filename)
 	    self.X_test, self.y_test = joblib.load(self.load_test_filename)
 
-	    self.max_nb_variables = X_train.shape[1]
+	    self.max_num_features = X_train.shape[1]
 	    self.max_timesteps = X_train.shape[-1]
 
 	    # extract labels Y and normalize to [0 - (MAX - 1)] range
@@ -203,7 +251,10 @@ class MLSTM_FCN(object):
 	def train_model(self, epochs=50, batch_size=128, val_subset=None, cutoff=None, 
 						dataset_prefix='rename_me_', dataset_fold_id=None, 
 						learning_rate=1e-3, monitor='loss', optimization_mode='auto', 
-						compute_class_weights=True, compile_model=True):
+						compute_class_weights=True, compile_model=True,
+						optimizer=None, use_model_checkpoint=True, use_lr_reduce=True,
+						use_tensorboard=True, loss='categorical_crossentropy', 
+						metrics=['accuracy']):
 
 	    self._classes = np.unique(self.y_train)
 	    self._lbl_enc = LabelEncoder()
@@ -233,42 +284,63 @@ class MLSTM_FCN(object):
 	    else:
 	        self.weight_fn = "./weights/{}_fold_{}_weights.h5".format(dataset_prefix, dataset_fold_id)
 
-	    model_checkpoint = ModelCheckpoint(weight_fn, verbose=1, mode=optimization_mode,
-	                                       monitor=monitor, save_best_only=True, save_weights_only=True)
+	    callback_list = []
 
-	    reduce_lr = ReduceLROnPlateau(monitor=monitor, patience=100, mode=optimization_mode,
-	                                  factor=factor, cooldown=0, min_lr=1e-4, verbose=2)
+	    if use_model_checkpoint:
+		    model_checkpoint = ModelCheckpoint(weight_fn, verbose=1, mode=optimization_mode,
+		                                       monitor=monitor, save_best_only=True, save_weights_only=True)
+		    
+		    callback_list.append(model_checkpoint)
+
+		if use_lr_reduce:
+		    reduce_lr = ReduceLROnPlateau(monitor=monitor, patience=100, mode=optimization_mode,
+		                                  factor=factor, cooldown=0, min_lr=1e-4, verbose=2)
+
+		    callback_list.append(reduce_lr)
 	    
-	    callback_list = [model_checkpoint, reduce_lr]
+	    if use_tensorboard:
+		    tensorboard = TrainValTensorboard(  log_dir='./logs/log-{}'.format(int(time())),
+		    									write_graph=False)
 
-	    optm = Adam(lr=learning_rate)
+		   	callback_list.append(tensorboard)
+
+		if use_early_stopping:
+			early_stopping = EarlyStopping(monitor='val_acc', min_delta=0, patience=10, verbose=1, mode='auto')
+
+			callback_list.append(early_stopping)
+
+	    if optimizer is None: optimizer = Adam(lr=learning_rate)
 
 	    if compile_model:
-	        model.compile(optimizer=optm, loss='categorical_crossentropy', metrics=['accuracy'])
+	        model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
 
 	    if val_subset is not None:
-	        X_test = X_test[:val_subset]
-	        y_test = y_test[:val_subset]
+	    	# This removes 20% of the data to be ignored until after training
+	    	#	should be done before this step; but it's here for completeness.
+	    	idx_test, idx_val = train_test_split(np.arange(y_test), test_size=0.2)
+	        X_test = X_test[idx_test]
+	        y_test = y_test[idx_test]
 
 	    model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, callbacks=callback_list,
 	              class_weight=class_weight, verbose=2, validation_data=(X_test, y_test))
 
 	def evaluate_model(self, test_data_subset=None, cutoff=None, dataset_fold_id=None):
 		
-	    if max_nb_variables != MAX_NB_VARIABLES[dataset_id]:
-	        if cutoff is None:
-	            choice = cutoff_choice(dataset_id, max_nb_variables)
-	        else:
-	            assert cutoff in ['pre', 'post'], 'Cutoff parameter value must be either "pre" or "post"'
-	            choice = cutoff
+	    # if max_nb_features != MAX_NB_VARIABLES[dataset_id]:
+	    #     if cutoff is None:
+	    #         choice = cutoff_choice(dataset_id, max_nb_features)
+	    #     else:
+	    #         assert cutoff in ['pre', 'post'], 'Cutoff parameter value must be either "pre" or "post"'
+	    #         choice = cutoff
 
-	        if choice not in ['pre', 'post']:
-	            return
-	        else:
-	            _, X_test = cutoff_sequence(None, X_test, choice, dataset_id, max_nb_variables)
+	    #     if choice not in ['pre', 'post']:
+	    #         return
+	    #     else:
+	    #         _, X_test = cutoff_sequence(None, X_test, choice, dataset_id, max_nb_features)
 
-	    if not is_timeseries:
-	        X_test = pad_sequences(X_test, maxlen=MAX_NB_VARIABLES[dataset_id], padding='post', truncating='post')
+	    # if not is_timeseries:
+	    #     X_test = pad_sequences(X_test, maxlen=MAX_NB_VARIABLES[dataset_id], padding='post', truncating='post')
+
 	    y_test = to_categorical(y_test, len(np.unique(y_test)))
 
 	    optm = Adam(lr=1e-3)
