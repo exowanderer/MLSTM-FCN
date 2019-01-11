@@ -82,7 +82,7 @@ class MLSTM_FCN(object):
 		input_layer = Input(shape=self.input_shape)
 
 		rnn_tower = Masking()(input_layer)
-		
+
 		if Attention:
 			rnn_tower = AttentionLSTM(n_lstm_cells)(rnn_tower)
 		else:
@@ -153,6 +153,7 @@ class MLSTM_FCN(object):
 
 if __name__ == "__main__":
 
+	arabic_voice_DATASET_INDEX = 27
 	arabic_voice_settings = dict(n_lstm_cells = 8, 
 								 dropout_rate = 0.8, 
 								 permute_dims = (2,1), 
@@ -167,19 +168,19 @@ if __name__ == "__main__":
 			 					 # Attention = False, 
 			 					 # Squeeze = True, 
     # Model 1
-    instance1 = MLSTM_FCN(DATASET_INDEX=27)
+    instance1 = MLSTM_FCN(DATASET_INDEX=arabic_voice_DATASET_INDEX)
     instance1.create_model(**arabic_voice_settings)
 
     # Model 2
-    instance2 = MLSTM_FCN(DATASET_INDEX=27)
+    instance2 = MLSTM_FCN(DATASET_INDEX=arabic_voice_DATASET_INDEX)
     instance2.create_model(Attention=True, **arabic_voice_settings)
     
     # Model 3
-    instance3 = MLSTM_FCN(DATASET_INDEX=27, **arabic_voice_settings)
+    instance3 = MLSTM_FCN(DATASET_INDEX=arabic_voice_DATASET_INDEX)
     instance3.create_model(Squeeze=False, **arabic_voice_settings)
     
     # Model 4
-    instance4 = MLSTM_FCN(DATASET_INDEX=27)
+    instance4 = MLSTM_FCN(DATASET_INDEX=arabic_voice_DATASET_INDEX)
     instance4.create_model(Attention=True, Squeeze=False, **arabic_voice_settings)
     
     train_model(instance1.model, DATASET_INDEX, dataset_prefix='arabic_voice_', epochs=1000, batch_size=128)
