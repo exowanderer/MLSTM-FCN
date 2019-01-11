@@ -364,8 +364,11 @@ class MLSTM_FCN(object):
 
 if __name__ == "__main__":
 
+	model_type_name = 'mlstm_fcn'
 	data_set_name = 'plasticc'
 	
+	save_filename = '{}_{}_{}_save_model_class.joblib.save'.format(model_type_name, data_set_name, int(time()))
+
 	dataset_settings = dict(n_lstm_cells = 8, 
 							dropout_rate = 0.8, 
 							permute_dims = (2,1), 
@@ -389,7 +392,7 @@ if __name__ == "__main__":
 
 	instance1.train_model(epochs=1000, batch_size=128)
 	instance1.evaluate_model(batch_size=128)
-	
+	instance1.save_model(save_filename)
 	# # Model 2
 	# instance2 = MLSTM_FCN(DATASET_INDEX=DATASET_INDEX)
 	# instance2.create_model(Attention=True, **dataset_settings)
