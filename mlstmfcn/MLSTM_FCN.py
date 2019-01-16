@@ -151,13 +151,14 @@ def squeeze_excite_block(tower,
 	return squeeze_excite
 
 class MLSTM_FCN(object):
-	def __init__(self, verbose=False):
+	def __init__(self, time_stamp=int(time()), verbose=False):
 
 		# num_max_times = MAX_TIMESTEPS_LIST[DATASET_INDEX]
 		# num_max_var = MAX_NB_VARIABLES[DATASET_INDEX]
 		
 		# self.num_classes = NB_CLASSES_LIST[DATASET_INDEX]
 		self.verbose = verbose
+		self.time_stamp = time_stamp
 		self.trained_ = False
 
 	def create_model(self, 
@@ -347,29 +348,31 @@ class MLSTM_FCN(object):
 						use_lr_reduce=True, use_tensorboard=True, 
 						use_early_stopping=True, metrics=['accuracy'], 
 						loss='categorical_crossentropy',
-						logdir = './logs/log-{}'):
+						logdir = './logs/log-{}',
+						weights_dir = './weights/'):
 
 		self.dataset_prefix = dataset_prefix
 		self.dataset_fold_id = dataset_fold_id
 
-		if '{}' in logdir: logdir.format(int(time()))
+		if '{}' in logdir: logdir.format(self.time_stamp)
 
 		self.learning_rate = learning_rate
 
-		self._lbl_enc = LabelEncoder()
+		self._LabelEncoder = LabelEncoder()
 		
-		y_ind = self._lbl_enc.fit_transform(self.y_train.ravel())
+		y_ind = self._LabelEncoder.fit_transform(self.y_train.ravel())
 		
 		if compute_class_weights:
 
 			len_train = len(self.y_train)
-			len_lbl_enc = len(self._lbl_enc.classes_)
+			len_lbl_enc = len(self._LabelEncoder.classes_)
 			bincount_y_ind = np.bincount(y_ind).astype(np.float64)
 			
 			recip_freq = len_train / (len_lbl_enc * bincount_y_ind)
 
 			self.class_weights_ = recip_freq[
-									self._lbl_enc.transform(self.classes)]
+									self._LabelEncoder.transform(self.classes)
+									]
 		else:
 			self.class_weights_ = np.ones(self.y_train.size) / self.num_classes
 
@@ -383,13 +386,29 @@ class MLSTM_FCN(object):
 		else:
 			factor = 1. / np.sqrt(2)
 
-		if dataset_fold_id is None:
-			self.weight_fn = "./weights/{}_weights.h5".format(
-									self.dataset_prefix)
+		if self.dataset_fold_id is None:
+			self.weight_fn = weights_dir + "{}_{}_weights.h5".format(
+									self.dataset_prefix, self.time_stamp)
 		else:
-			self.weight_fn = "./weights/{}_fold_{}_weights.h5".format(
-									self.dataset_prefix, self.dataset_fold_id)
+			self.weight_fn = weights_dir + \
+								"{}_{}_fold_{}_weights.h5".format(
+								self.dataset_prefix, self.time_stamp, 
+								self.dataset_fold_id)
 
+		while os.path.exists(self.weight_fn):
+			if self.dataset_fold_id is None: self.dataset_fold_id = 1
+
+			if 'fold' in self.weight_fn:
+				old_fold = '_fold_{}_weights.h5'.format(self.dataset_fold_id-1)
+			else:
+				old_fold = '_weights.h5'
+
+			new_fold = '_fold_{}_weights.h5'.format(self.dataset_fold_id)
+
+			self.weight_fn = self.weight_fn.replace(old_fold, new_fold)
+
+			self.dataset_fold_id += 1
+		
 		callback_list = []
 
 		if use_model_checkpoint:
@@ -448,10 +467,12 @@ class MLSTM_FCN(object):
 			X_test_local = self.X_test
 			y_test_local = self.y_test
 
-		self.model.fit(self.X_train, self.y_train, batch_size=batch_size, 
-						epochs=epochs, callbacks=callback_list, 
-						class_weight=self.class_weights_, verbose=2, 
-						validation_data=(X_test_local, y_test_local))
+		self.results_ = self.model.fit(self.X_train, self.y_train, 
+										batch_size=batch_size, epochs=epochs, 
+										callbacks=callback_list, verbose=2, 
+										class_weight=self.class_weights_, 
+										validation_data=(X_test_local, 
+															y_test_local))
 
 		self.trained_ = True
 
@@ -460,7 +481,7 @@ class MLSTM_FCN(object):
 						dataset_fold_id=None, return_all=False):
 		
 		assert(self.trained_), "Cannot evaluate a model "\
-							  "that has not been trained"
+							   "that has not been trained"
 
 		if ytest is not None:
 			self.y_test = ytest
@@ -477,12 +498,12 @@ class MLSTM_FCN(object):
 						loss='categorical_crossentropy', 
 						metrics=['accuracy'])
 
-		if dataset_fold_id is None:
-			self.weight_fn = "./weights/{}_weights.h5".format(
-									self.dataset_prefix)
-		else:
-			self.weight_fn = "./weights/{}_fold_{}_weights.h5".format(
-									self.dataset_prefix, self.dataset_fold_id)
+		# if dataset_fold_id is None:
+		# 	self.weight_fn = "./weights/{}_weights.h5".format(
+		# 							self.dataset_prefix)
+		# else:
+		# 	self.weight_fn = "./weights/{}_fold_{}_weights.h5".format(
+		# 							self.dataset_prefix, self.dataset_fold_id)
 
 		self.model.load_weights(self.weight_fn)
 
@@ -519,7 +540,8 @@ class MLSTM_FCN(object):
 
 def main(model_type_name='', dataset_prefix='', n_train_samples=80, 
 			n_test_samples=20, n_features=20, n_timesteps=25, verbose=False,
-			x_mean=10, x_std=3, classes=[0,1,2,3], n_epochs=2, batch_size=128):
+			x_mean=10, x_std=3, classes=[0,1,2,3], n_epochs=2, batch_size=128,
+			save_dir='./', time_stamp=None):
 
 	import numpy as np
 
@@ -533,9 +555,11 @@ def main(model_type_name='', dataset_prefix='', n_train_samples=80,
 	
 	ytrain = np.random.choice(classes,n_train_samples)
 	ytest = np.random.choice(classes,n_test_samples)
-
-	save_filename = '{}_{}_{}_save_model_class.joblib.save'.format(
-								model_type_name, dataset_prefix, int(time()))
+	
+	time_stamp = time_stamp or int(time())
+	
+	save_filename = save_dir + '{}_{}_{}_save_model_class.joblib.save'.format(
+								model_type_name, dataset_prefix, time_stamp)
 
 	dataset_settings = dict(n_lstm_cells = 8, 
 							dropout_rate = 0.8, 
@@ -547,13 +571,14 @@ def main(model_type_name='', dataset_prefix='', n_train_samples=80,
 							squeeze_ratio = 16, 
 							logit_output = 'sigmoid', 
 							squeeze_initializer = 'he_normal', 
-							use_bias = False, 
+							use_bias = False,
 							verbose = verbose)
 							# Attention = False, # Default
 							# Squeeze = True,  # Default
 
 	# Model 1
-	instance = MLSTM_FCN(verbose=verbose)
+	instance = MLSTM_FCN(verbose = verbose, 
+						 time_stamp = time_stamp)
 
 	# instance.load_dataset(train_filename, test_filename, 
 	# 							normalize=True)
@@ -594,11 +619,12 @@ if __name__ == '__main__':
 	model_type_name = 'mlstm_fcn'
 	dataset_prefix = 'plasticc'
 	batch_size = 128
-	
-	instance1 = main(model_type_name, dataset_prefix, verbose=True)
+
+	instance1 = main(model_type_name, 
+					dataset_prefix=dataset_prefix, 
+					verbose=True)
 
 	instance2 = MLSTM_FCN(verbose=True)
 	instance2.load_instance(instance1.save_filename)
 
-	instance1.evaluate_model(batch_size=batch_size)
 	instance2.evaluate_model(batch_size=batch_size)
