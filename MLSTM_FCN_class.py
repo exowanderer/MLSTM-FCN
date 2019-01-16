@@ -62,6 +62,47 @@ class TrainValTensorboard(TensorBoard):
 		super(TrainValTensorboard, self).on_train_end(logs)
 		self.val_writer.close()
 
+def conditional_multiple_instances(list_of_inputs, list_of_instances, condition='and'):
+	''' Checks if a list of inputs matches a list of types
+    Args:
+        list_of_inputs (list, tuple): list of inputs to be checked
+        list_of_instances (list, tuple): the list of instances to check if the inputs are amongst
+        condition (str; optional): can be `'and'` or '`or`', 
+        	depending on how the user wants to combine the booleans
+	
+    Returns: (bool) Condition satisfied (True) or not (False)
+
+    Examples:
+    	>>> list1 = [1,2,3,4]
+    	>>> list2 = [0,2,4,8,16,32]
+    	>>> tuple1 = ('thing1', 'thing2')
+    	>>> array1 = np.array([list1])
+    	>>> conditional_multiple_instances([list1, list2, list3, array1, tuple1], \
+    										(list, tuple, np.array), condition='and')
+    	
+    	True # because all types are included in the list of instances
+    	
+    	>>> conditional_multiple_instances([list1, list2, list3, array1, tuple1], \
+    										(list, tuple), condition='or')
+
+    	True # because any of the `isinstances` are satisfied
+
+    	>>> conditional_multiple_instances([list1, list2, list3, array1, tuple1], \
+    										(list, tuple), condition='and')
+
+    	False # because the array1 is not a list or tuple
+    '''
+	conditon_all = True
+
+	for inputnow in list_of_inputs:
+		if isinstance(inputnow, list_of_instances):
+			conditon_all *= True
+			if condition == 'or': return True
+
+	return conditional_all
+
+
+
 
 def Conv1D_Stack(input_stack, conv1d_depth, conv1d_kernel, 
 				activation_func, local_initializer):
@@ -199,27 +240,36 @@ class MLSTM_FCN(object):
 		
 		# add load model code ere to fine-tune
 
-	def load_dataset(load_train_filename, load_test_filename,
+	def load_dataset(load_train_filename=None, load_test_filename=None,
+						xtrain=None, ytrain=None, xtest=None, ytest=None,
 						is_timeseries = True, normalize_timeseries=False, 
 						x_tol = 1e-8, verbose = True) -> (np.array, np.array):
+
+		if load_train_filename is None or load_train_filename is None:
+			load_train_filename = load_train_filename or 'Train Data Provided Directly'
+			load_test_filename = load_test_filename or 'Test Data Provided Directly'
+		elif isinstance(load_train_filename, str) and isinstance(load_test_filename, str):
+		    
+			if verbose: 
+		    	print("Loading training data at: ", self.load_train_filename)
+		    	print("Loading testing data at: ", self.load_test_filename)
+
+		    if not os.path.exists(load_train_filename):
+		        raise FileNotFoundError('File {} not found!'.format(self.load_train_filename))
+			
+			if not os.path.exists(load_test_filename):
+		        raise FileNotFoundError('File {} not found!'.format(self.load_test_filename))
+
+		    self.X_train, self.y_train = joblib.load(self.load_train_filename)
+		    self.X_test, self.y_test = joblib.load(self.load_test_filename)
+		elif isinstance(xtrain, [list, np.array, tuple]) and isinstance(xtrain, [list, np.array, tuple])
+		else:
+			raise ValueError('User must either provide ')
 
 		self.is_timeseries = is_timeseries
 		self.normalize_timeseries = normalize_timeseries
 		self.load_train_filename = load_train_filename
 		self.load_test_filename = load_test_filename
-
-	    if verbose: 
-	    	print("Loading training data at: ", self.load_train_filename)
-	    	print("Loading testing data at: ", self.load_test_filename)
-
-	    if not os.path.exists(load_train_filename):
-	        raise FileNotFoundError('File {} not found!'.format(self.load_train_filename))
-		
-		if not os.path.exists(load_test_filename):
-	        raise FileNotFoundError('File {} not found!'.format(self.load_test_filename))
-
-	    self.X_train, self.y_train = joblib.load(self.load_train_filename)
-	    self.X_test, self.y_test = joblib.load(self.load_test_filename)
 
 	    self.max_num_features = X_train.shape[1]
 	    self.max_timesteps = X_train.shape[-1]
