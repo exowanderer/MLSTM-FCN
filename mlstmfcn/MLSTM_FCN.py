@@ -151,7 +151,7 @@ def squeeze_excite_block(tower,
 	return squeeze_excite
 
 class MLSTM_FCN(object):
-	def __init__(self, TRAINABLE=True, verbose=False):
+	def __init__(self, verbose=False):
 
 		# num_max_times = MAX_TIMESTEPS_LIST[DATASET_INDEX]
 		# num_max_var = MAX_NB_VARIABLES[DATASET_INDEX]
@@ -506,14 +506,21 @@ class MLSTM_FCN(object):
 
 		if return_all: return loss, accuracy
 
-	def save_instance(self, save_filename):
-		joblib.dump(self, save_filename)
+	def save_instance(self, save_filename, verbose=False):
+		if self.verbose or verbose:
+			print('[INFO]: Saving Results to {}'.format(save_filename))
+
+		self.save_filename = save_filename
+
+		joblib.dump(self.__dict__ , self.save_filename)
 
 	def load_instance(self, load_filename):
-		self.__dict__ = joblib.load(load_filename).__dict__ 
+		self.__dict__ = joblib.load(load_filename)
 
-def main(n_train_samples=80, n_test_samples=20, n_features=20, n_timesteps=25,
+def main(model_type_name='', dataset_prefix='', n_train_samples=80, 
+			n_test_samples=20, n_features=20, n_timesteps=25, verbose=False,
 			x_mean=10, x_std=3, classes=[0,1,2,3], n_epochs=2, batch_size=128):
+
 	import numpy as np
 
 	from mlstmfcn import MLSTM_FCN
@@ -527,9 +534,6 @@ def main(n_train_samples=80, n_test_samples=20, n_features=20, n_timesteps=25,
 	ytrain = np.random.choice(classes,n_train_samples)
 	ytest = np.random.choice(classes,n_test_samples)
 
-	model_type_name = 'mlstm_fcn'
-	dataset_prefix = 'plasticc'
-	
 	save_filename = '{}_{}_{}_save_model_class.joblib.save'.format(
 								model_type_name, dataset_prefix, int(time()))
 
@@ -544,41 +548,57 @@ def main(n_train_samples=80, n_test_samples=20, n_features=20, n_timesteps=25,
 							logit_output = 'sigmoid', 
 							squeeze_initializer = 'he_normal', 
 							use_bias = False, 
-							verbose = True)
+							verbose = verbose)
 							# Attention = False, # Default
 							# Squeeze = True,  # Default
 
 	# Model 1
-	instance1 = MLSTM_FCN()
+	instance = MLSTM_FCN(verbose=verbose)
 
-	# instance1.load_dataset(train_filename, test_filename, 
+	# instance.load_dataset(train_filename, test_filename, 
 	# 							normalize=True)
 
-	instance1.load_dataset( xtrain=xtrain, ytrain=ytrain, 
+	instance.load_dataset( xtrain=xtrain, ytrain=ytrain, 
 							xtest=xtest, ytest=ytest,
 							normalize=True)
 
-	instance1.create_model(**dataset_settings)
+	instance.create_model(**dataset_settings)
 	
-	instance1.train_model(epochs=n_epochs, batch_size=batch_size, 
+	instance.train_model(epochs=n_epochs, batch_size=batch_size, 
 							dataset_prefix=dataset_prefix)
 
-	instance1.evaluate_model(batch_size=batch_size)
-	instance1.save_instance(save_filename)
+	instance.evaluate_model(batch_size=batch_size)
+	instance.save_instance(save_filename)
+
+	return instance
+
 	# # Model 2
-	# instance2 = MLSTM_FCN()
+	# instance2 = MLSTM_FCN(verbose=verbose)
 	# instance2.create_model(Attention=True, **dataset_settings)
 
 	# # Model 3
-	# instance3 = MLSTM_FCN()
+	# instance3 = MLSTM_FCN(verbose=verbose)
 	# instance3.create_model(Squeeze=False, **dataset_settings)
 
 	# # Model 4
-	# instance4 = MLSTM_FCN()
+	# instance4 = MLSTM_FCN(verbose=verbose)
 	# instance4.create_model(Attention=True, Squeeze=False, **dataset_settings)
 
-	# train_model(instance1.model, X_train, y_train, X_test, y_test, is_timeseries, epochs=1000, batch_size=128)
-	# evaluate_model(instance1.model, X_test, y_test, is_timeseries, batch_size=128)
+	# train_model(instance.model, X_train, y_train, X_test, y_test, is_timeseries, epochs=1000, batch_size=128)
+	# evaluate_model(instance.model, X_test, y_test, is_timeseries, batch_size=128)
 
 if __name__ == '__main__':
-	main()
+	from mlstmfcn import MLSTM_FCN, main
+	from time import time
+
+	model_type_name = 'mlstm_fcn'
+	dataset_prefix = 'plasticc'
+	batch_size = 128
+	
+	instance1 = main(model_type_name, dataset_prefix, verbose=True)
+
+	instance2 = MLSTM_FCN(verbose=True)
+	instance2.load_instance(instance1.save_filename)
+
+	instance1.evaluate_model(batch_size=batch_size)
+	instance2.evaluate_model(batch_size=batch_size)
