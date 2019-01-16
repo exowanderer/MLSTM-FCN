@@ -19,6 +19,8 @@ import warnings
 warnings.simplefilter('ignore', category=DeprecationWarning)
 
 class TrainValTensorboard(TensorBoard):
+    # Created from
+    #   https://stackoverflow.com/questions/47877475/keras-tensorboard-plot-train-and-validation-scalars-in-a-same-figure
 	def __init__(self, log_dir='./logs', **kwargs):
 		
 		self.log_dir = log_dir
