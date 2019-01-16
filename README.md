@@ -2,8 +2,8 @@
 MLSTM FCN models, from the paper [Multivariate LSTM_FCNs for Time Series Classification](https://arxiv.org/abs/1801.04503), 
 augment the squeeze and excitation block with the state of the art univariate time series model, LSTM_FCN and ALSTM_FCN from the paper [LSTM Fully Convolutional Networks for Time Series Classification](https://arxiv.org/abs/1709.05206). The code for the LSTM_FCN and ALSTM_FCN models can be found at [LSTM_FCN](https://github.com/houshd/LSTM_FCN).
 
-<img src="https://github.com/exowanderer/MLSTM_FCN/blob/master/images/MLSTM_FCN.png?raw=true" height=100% width=100%>
-<img src="https://github.com/exowanderer/MLSTM_FCN/blob/master/images/MLSTM1_FCN.png?raw=true" height=100% width=100%>
+<img src="images/MLSTM_FCN.png?raw=true" height=100% width=100%>
+<img src="images/MLSTM1_FCN.png?raw=true" height=100% width=100%>
 
 # Installation 
 Download the repository and apply `pip install -r requirements.txt` to install the required libraries. 
