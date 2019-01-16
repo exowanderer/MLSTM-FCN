@@ -255,7 +255,7 @@ class MLSTM_FCN(object):
 				self.y_train = ytrain
 				self.X_test = xtest
 				self.y_test = ytest
-		elif isinstances((load_train_filename, load_test_filename), (str))
+		elif isinstances((load_train_filename, load_test_filename), (str)):
 			if verbose: 
 				print("Loading training data at: ", self.load_train_filename)
 				print("Loading testing data at: ", self.load_test_filename)
@@ -418,7 +418,7 @@ class MLSTM_FCN(object):
 							cutoff=None, dataset_fold_id=None, 
 							return_all=True):
 		
-		assert(self.trained), "Cannot evaluate a model "
+		assert(self.trained), "Cannot evaluate a model "\
 							  "that has not been trained"
 
 		self.y_test = to_categorical(self.y_test, len(np.unique(self.y_test)))
@@ -460,7 +460,7 @@ if __name__ == "__main__":
 	
 	save_filename = '{}_{}_{}_save_model_class.joblib.save'.format(
 								model_type_name, data_set_name, int(time()))
-	
+
 	dataset_settings = dict(n_lstm_cells = 8, 
 							dropout_rate = 0.8, 
 							permute_dims = (2,1), 
