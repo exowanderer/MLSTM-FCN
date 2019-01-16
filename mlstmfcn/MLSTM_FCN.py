@@ -1,19 +1,25 @@
 import os
 import tensorflow as tf
+import numpy as np
 
-from keras.models import Model
+# from .utils.constants import MAX_NB_VARIABLES, NB_CLASSES_LIST, MAX_TIMESTEPS_LIST
+# from .utils.keras_utils import train_model, evaluate_model, set_trainable
+from .utils.layer_utils import AttentionLSTM
+
 from keras.layers import Input, Dense, LSTM, Activation, Masking, Reshape
 from keras.layers import multiply, concatenate
 from keras.layers import Conv1D, BatchNormalization, GlobalAveragePooling1D
 from keras.layers import Permute, Dropout
+from keras.models import Model
+from keras.optimizers import Adam
+from keras.utils import to_categorical
 
 from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, TensorBoard, EarlyStopping
 
-from utils.constants import MAX_NB_VARIABLES, NB_CLASSES_LIST, MAX_TIMESTEPS_LIST
-from utils.keras_utils import train_model, evaluate_model, set_trainable
-from utils.layer_utils import AttentionLSTM
-
 from sklearn.externals import joblib
+from sklearn.preprocessing import LabelEncoder
+
+from time import time
 
 import warnings
 warnings.simplefilter('ignore', category=DeprecationWarning)
@@ -93,16 +99,13 @@ def isinstances(list_of_inputs, list_of_instances, condition='and'):
 		False # because the array1 is not a list or tuple
 	'''
 	conditon_all = True
-
+	
 	for inputnow in list_of_inputs:
 		if isinstance(inputnow, list_of_instances):
 			conditon_all *= True
 			if condition == 'or': return True
 
-	return conditional_all
-
-
-
+	return conditon_all
 
 def Conv1D_Stack(input_stack, conv1d_depth, conv1d_kernel, 
 				activation_func, local_initializer):
@@ -148,15 +151,13 @@ def squeeze_excite_block(tower,
 	return squeeze_excite
 
 class MLSTM_FCN(object):
-	def __init__(self, DATASET_INDEX=None, TRAINABLE=True):
+	def __init__(self, TRAINABLE=True, verbose=False):
 
-		num_max_times = MAX_TIMESTEPS_LIST[DATASET_INDEX]
-		num_max_var = MAX_NB_VARIABLES[DATASET_INDEX]
+		# num_max_times = MAX_TIMESTEPS_LIST[DATASET_INDEX]
+		# num_max_var = MAX_NB_VARIABLES[DATASET_INDEX]
 		
-		self.num_classes = NB_CLASSES_LIST[DATASET_INDEX]
-
-		self.input_shape = (num_max_var, num_max_times)
-
+		# self.num_classes = NB_CLASSES_LIST[DATASET_INDEX]
+		self.verbose = verbose
 		self.trained_ = False
 
 	def create_model(self, 
@@ -236,40 +237,41 @@ class MLSTM_FCN(object):
 		
 		self.model = Model(input_layer, output_layer)
 
-		if verbose: self.model.summary()
+		if self.verbose or verbose: self.model.summary()
 		
 		# add load model code ere to fine-tune
 
-	def load_dataset(train_filename=None, test_filename=None,
+	def load_dataset(self, train_filename=None, test_filename=None,
 						xtrain=None, ytrain=None, xtest=None, ytest=None,
-						is_timeseries = True, normalize_timeseries=True, 
-						verbose = True):
+						is_timeseries = True, normalize=True, 
+						verbose = False):
 
-		if None in [load_train_filename, load_train_filename] \
-			and None not in [xtrain, ytrain, xtest, ytest]:
-			load_train_filename = load_train_filename or 'Train Data Provided Directly'
-			load_test_filename = load_test_filename or 'Test Data Provided Directly'
+		if None in [train_filename, train_filename] \
+			and np.all([t is not None for t in [xtrain,ytrain,xtest,ytest]]):
 
-			if isinstances((xtrain,ytrain,xtest,ytest),(list,np.array,tuple)):
+			train_filename = train_filename or 'Train Data Provided Directly'
+			test_filename = test_filename or 'Test Data Provided Directly'
+
+			if isinstances((xtrain,ytrain,xtest,ytest),(list,np.ndarray,tuple)):
 				self.X_train = xtrain
 				self.y_train = ytrain
 				self.X_test = xtest
 				self.y_test = ytest
-		elif isinstances((load_train_filename, load_test_filename), (str)):
-			if verbose: 
-				print("Loading training data at: ", self.load_train_filename)
-				print("Loading testing data at: ", self.load_test_filename)
+		elif isinstances((train_filename, test_filename), (str)):
+			if self.verbose or verbose:
+				print("Loading training data at: ", self.train_filename)
+				print("Loading testing data at: ", self.test_filename)
 
-			if not os.path.exists(load_train_filename):
+			if not os.path.exists(train_filename):
 				raise FileNotFoundError('File {} not found!'.format(\
-											self.load_train_filename))
+											self.train_filename))
 			
-			if not os.path.exists(load_test_filename):
+			if not os.path.exists(test_filename):
 				raise FileNotFoundError('File {} not found!'.format(\
-											self.load_test_filename))
+											self.test_filename))
 
-			self.X_train, self.y_train = joblib.load(self.load_train_filename)
-			self.X_test, self.y_test = joblib.load(self.load_test_filename)
+			self.X_train, self.y_train = joblib.load(self.train_filename)
+			self.X_test, self.y_test = joblib.load(self.test_filename)
 		else:
 			raise ValueError("User must either provide data directly "
 							 "(i.e. xtrain=ndarray, ytrain=array, ...), "
@@ -277,50 +279,58 @@ class MLSTM_FCN(object):
 							 "(i.e. train_filename = str, test_filename = str)")
 
 		self.is_timeseries = is_timeseries
-		self.normalize_timeseries = normalize_timeseries
-		self.load_train_filename = load_train_filename
-		self.load_test_filename = load_test_filename
+		self.normalize = normalize
+		self.train_filename = train_filename
+		self.test_filename = test_filename
 
-		self.num_classes = len(np.unique(self.y_train))
+		self.classes = np.unique(self.y_train)
+		self.num_classes = len(self.classes)
 		self.max_num_features = self.X_train.shape[1]
 		self.max_timesteps = self.X_train.shape[-1]
 		
-		if self.normalize_timeseries: self.normalize_dataset()
+		self.input_shape = (self.max_num_features, self.max_timesteps)
 
-	def normalize_dataset(self, x_tol=1e-8):
-		self.normalize_timeseries = True # set to True because it is now
+		if self.normalize: self.normalize_dataset()
+
+	def normalize_dataset(self, x_tol=1e-8, verbose = False):
+		self.normalize = True # set to True because it is now
 
 		# scale the values
 		if self.is_timeseries:
+			X_train_mean = self.X_train.mean(axis=0)
+			X_train_std = self.X_train.std(axis=0)
+			self.X_train = (self.X_train - X_train_mean) / (X_train_std + x_tol)
+			self.X_test = (self.X_test - X_train_mean) / (X_train_std + x_tol)
+		else:
 			X_train_mean = self.X_train.mean(axis=-1)
 			X_train_std = self.X_train.std(axis=-1)
 			self.X_train = (self.X_train - X_train_mean) / (X_train_std + x_tol)
 			self.X_test = (self.X_test - X_train_mean) / (X_train_std + x_tol)
-		else:
-			X_train_mean = self.X_train.mean(axis=1)
-			X_train_std = self.X_train.std(axis=1)
-			self.X_train = (self.X_train - X_train_mean) / (X_train_std + x_tol)
-			self.X_test = (self.X_test - X_train_mean) / (X_train_std + x_tol)
 
-		if verbose: print("Finished processing train dataset..")
+		if self.verbose or verbose: 
+			print("Finished processing train dataset..")
 
 		# extract labels Y and normalize to [0 - (MAX - 1)] range
-		y_train_range = (self.y_train.max() - self.y_train.min())
+		self._y_train_min = self.y_train.min()
+		self._y_train_max = self.y_train.max()
+		self._y_train_range = (self._y_train_max - self._y_train_min)
 		
-		self.y_train -= self.y_train.min()
-		self.y_train /= y_train_range
-		self.y_train *= self.num_classes - 1
+		self.y_train = self.y_train - self._y_train_min
+		self.y_train = self.y_train / self._y_train_range
+		self.y_train = self.y_train * (self.num_classes - 1)
 		
 		# extract labels Y and normalize to [0 - (MAX - 1)] range
 		# FINDME: Should we subtract the y_train.min() and divide
 		#			by the y_train_range instead of y_test?
-		y_test_range = (self.y_test.max() - self.y_test.min())
+		self._y_test_min = self.y_test.min()
+		self._y_test_max = self.y_test.max()
+		self._y_test_range = (self._y_test_max - self._y_test_min)
 		
-		self.y_test -= self.y_test.min()
-		self.y_test /= y_test_range
-		self.y_test *= self.num_classes - 1
+		self.y_test = self.y_test - self._y_test_min
+		self.y_test = self.y_test / self._y_test_range
+		self.y_test = self.y_test * (self.num_classes - 1)
 
-		if verbose:
+		if self.verbose or verbose:
 			print("Finished loading test dataset..")
 			print()
 			print("Number of train samples : ", self.X_train.shape[0])
@@ -328,18 +338,24 @@ class MLSTM_FCN(object):
 			print("Number of classes : ", self.num_classes)
 			print("Sequence length : ", self.X_train.shape[-1])
 
-	def train_model(self, epochs=50, batch_size=128, val_subset=None, 
+	def train_model(self, epochs=50, batch_size=128, val_subset_size=None, 
 						cutoff=None, dataset_prefix='rename_me_', 
 						dataset_fold_id=None, learning_rate=1e-3, 
 						monitor='loss', optimization_mode='auto', 
-						compute_class_weights=True, compile_model=True,
+						compute_class_weights=True, compile_model=True, 
 						optimizer=None, use_model_checkpoint=True, 
 						use_lr_reduce=True, use_tensorboard=True, 
-						loss='categorical_crossentropy', metrics=['accuracy']):
+						use_early_stopping=True, metrics=['accuracy'], 
+						loss='categorical_crossentropy',
+						logdir = './logs/log-{}'):
+
+		self.dataset_prefix = dataset_prefix
+		self.dataset_fold_id = dataset_fold_id
+
+		if '{}' in logdir: logdir.format(int(time()))
 
 		self.learning_rate = learning_rate
 
-		self._classes = np.unique(self.y_train)
 		self._lbl_enc = LabelEncoder()
 		
 		y_ind = self._lbl_enc.fit_transform(self.y_train.ravel())
@@ -352,14 +368,15 @@ class MLSTM_FCN(object):
 			
 			recip_freq = len_train / (len_lbl_enc * bincount_y_ind)
 
-			self.class_weights_ = recip_freq[self._lbl_enc.transform(self.classes)]
+			self.class_weights_ = recip_freq[
+									self._lbl_enc.transform(self.classes)]
 		else:
 			self.class_weights_ = np.ones(self.y_train.size) / self.num_classes
 
 		print("Class weights : ", self.class_weights_)
 
-		self.y_train = to_categorical(self.y_train, len(np.unique(self.y_train)))
-		self.y_test = to_categorical(self.y_test, len(np.unique(self.y_test)))
+		self.y_train = to_categorical(self.y_train, self.num_classes)
+		self.y_test = to_categorical(self.y_test, self.num_classes)
 
 		if self.is_timeseries:
 			factor = 1. / np.cbrt(2)
@@ -367,99 +384,154 @@ class MLSTM_FCN(object):
 			factor = 1. / np.sqrt(2)
 
 		if dataset_fold_id is None:
-			self.weight_fn = "./weights/{}_weights.h5".format(dataset_prefix)
+			self.weight_fn = "./weights/{}_weights.h5".format(
+									self.dataset_prefix)
 		else:
-			self.weight_fn = "./weights/{}_fold_{}_weights.h5".format(dataset_prefix, dataset_fold_id)
+			self.weight_fn = "./weights/{}_fold_{}_weights.h5".format(
+									self.dataset_prefix, self.dataset_fold_id)
 
 		callback_list = []
 
 		if use_model_checkpoint:
-			model_checkpoint = ModelCheckpoint(weight_fn, verbose=1, mode=optimization_mode,
-											   monitor=monitor, save_best_only=True, save_weights_only=True)
+			abs_weight_path = os.path.dirname(os.path.abspath(self.weight_fn))
+			if not os.path.exists(abs_weight_path):
+				print("Creating {}".format(abs_weight_path))
+				os.mkdir(abs_weight_path)
+
+			model_checkpoint = ModelCheckpoint(self.weight_fn, 
+												verbose=1, 
+												mode=optimization_mode, 
+												monitor=monitor, 
+												save_best_only=True, 
+												save_weights_only=True)
 			
 			callback_list.append(model_checkpoint)
 
 		if use_lr_reduce:
-			reduce_lr = ReduceLROnPlateau(monitor=monitor, patience=100, mode=optimization_mode,
-										  factor=factor, cooldown=0, min_lr=1e-4, verbose=2)
+			reduce_lr = ReduceLROnPlateau(	monitor=monitor, 
+											patience=100, 
+											mode=optimization_mode,
+											factor=factor, 
+											cooldown=0, 
+											min_lr=1e-4, 
+											verbose=2)
 
 			callback_list.append(reduce_lr)
 		
 		if use_tensorboard:
-			tensorboard = TrainValTensorboard(  log_dir='./logs/log-{}'.format(int(time())),
-												write_graph=False)
+			tensorboard = TrainValTensorboard(log_dir=logdir,write_graph=False)
 
 			callback_list.append(tensorboard)
 
 		if use_early_stopping:
-			early_stopping = EarlyStopping(monitor='val_acc', min_delta=0, patience=10, verbose=1, mode='auto')
+			early_stopping = EarlyStopping(monitor='val_acc', min_delta=0,
+											patience=10, verbose=1, 
+											mode='auto')
 
 			callback_list.append(early_stopping)
 
 		if optimizer is None: optimizer = Adam(lr=self.learning_rate)
 
 		if compile_model:
-			model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
+			self.model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
 
-		if val_subset is not None:
+		if val_subset_size is not None:
 			# This removes 20% of the data to be ignored until after training
 			#	should be done before this step; but it's here for completeness
-			idx_test, idx_val = train_test_split(np.arange(y_test), test_size=0.2)
-			X_test = X_test[idx_test]
-			y_test = y_test[idx_test]
+			y_test_idx = np.arange(self.y_test.size)
+			idx_test, idx_val = train_test_split(y_test_idx, 
+												test_size=val_subset_size)
 
-		model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, 
-					callbacks=callback_list, class_weight=self.class_weights_, 
-					verbose=2, validation_data=(X_test, y_test))
+			X_test_local = self.X_test[idx_test]
+			y_test_local = self.y_test[idx_test]
+		else:
+			X_test_local = self.X_test
+			y_test_local = self.y_test
+
+		self.model.fit(self.X_train, self.y_train, batch_size=batch_size, 
+						epochs=epochs, callbacks=callback_list, 
+						class_weight=self.class_weights_, verbose=2, 
+						validation_data=(X_test_local, y_test_local))
 
 		self.trained_ = True
 
-	def evaluate_model(self, optimizer=None, test_data_subset=None, 
-							cutoff=None, dataset_fold_id=None, 
-							return_all=True):
+	def evaluate_model(self, ytest=None, batch_size=128, optimizer=None, 
+						test_subset_size=None, cutoff=None, 
+						dataset_fold_id=None, return_all=False):
 		
-		assert(self.trained), "Cannot evaluate a model "\
+		assert(self.trained_), "Cannot evaluate a model "\
 							  "that has not been trained"
 
-		self.y_test = to_categorical(self.y_test, len(np.unique(self.y_test)))
+		if ytest is not None:
+			self.y_test = ytest
+
+			if self.normalize_dataset:
+				self.y_test = self.y_test - self._y_test_min
+				self.y_test = self.y_test / self._y_test_range
+				self.y_test = self.y_test * (self.num_classes - 1)
+
+			self.y_test = to_categorical(self.y_test, self.num_classes)
 
 		optimizer = optimizer or Adam(lr=self.learning_rate)
-		model.compile(	optimizer=optimizer, 
+		self.model.compile(	optimizer=optimizer, 
 						loss='categorical_crossentropy', 
 						metrics=['accuracy'])
 
 		if dataset_fold_id is None:
-			self.weight_fn = "./weights/{}_weights.h5".format(dataset_prefix)
+			self.weight_fn = "./weights/{}_weights.h5".format(
+									self.dataset_prefix)
 		else:
-			self.weight_fn = "./weights/{}_fold_{}_weights.h5".format(\
-											dataset_prefix, dataset_fold_id)
+			self.weight_fn = "./weights/{}_fold_{}_weights.h5".format(
+									self.dataset_prefix, self.dataset_fold_id)
 
-		model.load_weights(weight_fn)
+		self.model.load_weights(self.weight_fn)
 
-		if test_data_subset is not None:
-			X_test = X_test[:test_data_subset]
-			y_test = y_test[:test_data_subset]
+		if test_subset_size is not None:
+			# This removes 20% of the data to be ignored until after training
+			#	should be done before this step; but it's here for completeness
+			y_test_idx = np.arange(self.y_test.size)
+			idx_test, idx_val = train_test_split(y_test_idx, 
+												test_size=test_subset_size)
+
+			X_test_local = self.X_test[idx_test]
+			y_test_local = self.y_test[idx_test]
+		else:
+			X_test_local = self.X_test
+			y_test_local = self.y_test
 
 		print("\nEvaluating : ")
-		loss, accuracy = model.evaluate(X_test, y_test, batch_size=batch_size)
-		print("\nFinal Loss : ", loss)
-		print("\nFinal Accuracy : ", accuracy)
+		loss, accuracy = self.model.evaluate(self.X_test, self.y_test, 
+											batch_size=batch_size)
+		print("\nFinal Loss : {}\nFinal Accuracy : {}".format(loss, accuracy))
 
 		if return_all: return loss, accuracy
 
-	def save_model(self, save_filename):
+	def save_instance(self, save_filename):
 		joblib.dump(self, save_filename)
 
-	def load_model(self, load_filename):
+	def load_instance(self, load_filename):
 		self.__dict__ = joblib.load(load_filename).__dict__ 
 
-if __name__ == "__main__":
+def main(n_train_samples=80, n_test_samples=20, n_features=20, n_timesteps=25,
+			x_mean=10, x_std=3, classes=[0,1,2,3], n_epochs=2, batch_size=128):
+	import numpy as np
+
+	from mlstmfcn import MLSTM_FCN
+	from time import time
+
+	xtrain = np.random.normal(x_mean,x_std,
+							(n_train_samples, n_features, n_timesteps))
+	xtest = np.random.normal(x_mean,x_std,
+							(n_test_samples, n_features, n_timesteps))
+	
+	ytrain = np.random.choice(classes,n_train_samples)
+	ytest = np.random.choice(classes,n_test_samples)
 
 	model_type_name = 'mlstm_fcn'
-	data_set_name = 'plasticc'
+	dataset_prefix = 'plasticc'
 	
 	save_filename = '{}_{}_{}_save_model_class.joblib.save'.format(
-								model_type_name, data_set_name, int(time()))
+								model_type_name, dataset_prefix, int(time()))
 
 	dataset_settings = dict(n_lstm_cells = 8, 
 							dropout_rate = 0.8, 
@@ -472,30 +544,41 @@ if __name__ == "__main__":
 							logit_output = 'sigmoid', 
 							squeeze_initializer = 'he_normal', 
 							use_bias = False, 
-							verbose = False)
+							verbose = True)
 							# Attention = False, # Default
 							# Squeeze = True,  # Default
-	
+
 	# Model 1
-	instance1 = MLSTM_FCN(DATASET_INDEX=DATASET_INDEX)
+	instance1 = MLSTM_FCN()
+
+	# instance1.load_dataset(train_filename, test_filename, 
+	# 							normalize=True)
+
+	instance1.load_dataset( xtrain=xtrain, ytrain=ytrain, 
+							xtest=xtest, ytest=ytest,
+							normalize=True)
 
 	instance1.create_model(**dataset_settings)
-	instance1.load_dataset(load_train_filename, load_test_filename, normalize_timeseries=True)
+	
+	instance1.train_model(epochs=n_epochs, batch_size=batch_size, 
+							dataset_prefix=dataset_prefix)
 
-	instance1.train_model(epochs=1000, batch_size=128)
-	instance1.evaluate_model(batch_size=128)
-	instance1.save_model(save_filename)
+	instance1.evaluate_model(batch_size=batch_size)
+	instance1.save_instance(save_filename)
 	# # Model 2
-	# instance2 = MLSTM_FCN(DATASET_INDEX=DATASET_INDEX)
+	# instance2 = MLSTM_FCN()
 	# instance2.create_model(Attention=True, **dataset_settings)
 
 	# # Model 3
-	# instance3 = MLSTM_FCN(DATASET_INDEX=DATASET_INDEX)
+	# instance3 = MLSTM_FCN()
 	# instance3.create_model(Squeeze=False, **dataset_settings)
 
 	# # Model 4
-	# instance4 = MLSTM_FCN(DATASET_INDEX=DATASET_INDEX)
+	# instance4 = MLSTM_FCN()
 	# instance4.create_model(Attention=True, Squeeze=False, **dataset_settings)
 
 	# train_model(instance1.model, X_train, y_train, X_test, y_test, is_timeseries, epochs=1000, batch_size=128)
 	# evaluate_model(instance1.model, X_test, y_test, is_timeseries, batch_size=128)
+
+if __name__ == '__main__':
+	main()

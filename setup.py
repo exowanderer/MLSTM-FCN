@@ -1,7 +1,7 @@
 try:
-    from setuptools import setup
+    from setuptools import setup, find_packages
 except ImportError:
-    from distutils.core import setup
+    from distutils.core import setup, find_packages
 
 setup(name='mlstmfcn',
       version=0.1,
@@ -12,7 +12,7 @@ setup(name='mlstmfcn',
       license='GPL3',
       author="Somshubra Majumdar(titu1994), fazlekarim, "\
               "Jonathan Fraine (exowanderer)",
-      packages=['mlstm_fcn'],
+      packages=find_packages(),
       install_requires=['tensorflow>=1.4.0', 'keras>=2.1.2', 'scipy', 
                         'numpy', 'numpy', 'pandas',
                         'scikit-learn>=0.18.2', 'h5py'],
