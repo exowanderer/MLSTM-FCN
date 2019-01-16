@@ -62,7 +62,7 @@ class TrainValTensorboard(TensorBoard):
 		super(TrainValTensorboard, self).on_train_end(logs)
 		self.val_writer.close()
 
-def conditional_multiple_instances(list_of_inputs, list_of_instances, condition='and'):
+def conditional_multiple_isinstances(list_of_inputs, list_of_instances, condition='and'):
 	''' Checks if a list of inputs matches a list of types
     Args:
         list_of_inputs (list, tuple): list of inputs to be checked
@@ -77,17 +77,17 @@ def conditional_multiple_instances(list_of_inputs, list_of_instances, condition=
     	>>> list2 = [0,2,4,8,16,32]
     	>>> tuple1 = ('thing1', 'thing2')
     	>>> array1 = np.array([list1])
-    	>>> conditional_multiple_instances([list1, list2, list3, array1, tuple1], \
+    	>>> conditional_multiple_isinstances([list1, list2, list3, array1, tuple1], \
     										(list, tuple, np.array), condition='and')
     	
     	True # because all types are included in the list of instances
     	
-    	>>> conditional_multiple_instances([list1, list2, list3, array1, tuple1], \
+    	>>> conditional_multiple_isinstances([list1, list2, list3, array1, tuple1], \
     										(list, tuple), condition='or')
 
     	True # because any of the `isinstances` are satisfied
 
-    	>>> conditional_multiple_instances([list1, list2, list3, array1, tuple1], \
+    	>>> conditional_multiple_isinstances([list1, list2, list3, array1, tuple1], \
     										(list, tuple), condition='and')
 
     	False # because the array1 is not a list or tuple
@@ -240,16 +240,22 @@ class MLSTM_FCN(object):
 		
 		# add load model code ere to fine-tune
 
-	def load_dataset(load_train_filename=None, load_test_filename=None,
+	def load_dataset(train_filename=None, test_filename=None,
 						xtrain=None, ytrain=None, xtest=None, ytest=None,
-						is_timeseries = True, normalize_timeseries=False, 
-						x_tol = 1e-8, verbose = True) -> (np.array, np.array):
+						is_timeseries = True, normalize_timeseries=True, 
+						verbose = True):
 
-		if load_train_filename is None or load_train_filename is None:
+		if None in [load_train_filename, load_train_filename] \
+			and None not in [xtrain, ytrain, xtest, ytest]:
 			load_train_filename = load_train_filename or 'Train Data Provided Directly'
 			load_test_filename = load_test_filename or 'Test Data Provided Directly'
-		elif isinstance(load_train_filename, str) and isinstance(load_test_filename, str):
-		    
+
+			if conditional_multiple_isinstances((xtrain, ytrain, xtest, ytest), (list, np.array, tuple))
+				self.X_train = xtrain
+				self.y_train = ytrain
+				self.X_test = xtest
+				self.y_test = ytest
+		elif conditional_multiple_isinstances((load_train_filename, load_test_filename), (str))
 			if verbose: 
 		    	print("Loading training data at: ", self.load_train_filename)
 		    	print("Loading testing data at: ", self.load_test_filename)
@@ -262,39 +268,57 @@ class MLSTM_FCN(object):
 
 		    self.X_train, self.y_train = joblib.load(self.load_train_filename)
 		    self.X_test, self.y_test = joblib.load(self.load_test_filename)
-		elif isinstance(xtrain, [list, np.array, tuple]) and isinstance(xtrain, [list, np.array, tuple])
 		else:
-			raise ValueError('User must either provide ')
+			raise ValueError("User must either provide data directly "
+							 "(i.e. xtrain=ndarray, ytrain=array, ...), "
+							 "\nor the file location where data is located "
+							 "(i.e. train_filename = str, test_filename = str)")
 
 		self.is_timeseries = is_timeseries
 		self.normalize_timeseries = normalize_timeseries
 		self.load_train_filename = load_train_filename
 		self.load_test_filename = load_test_filename
 
-	    self.max_num_features = X_train.shape[1]
-	    self.max_timesteps = X_train.shape[-1]
-
-	    # extract labels Y and normalize to [0 - (MAX - 1)] range
 	    self.num_classes = len(np.unique(self.y_train))
-	    self.y_train = (self.y_train - self.y_train.min()) / (self.y_train.max() - self.y_train.min()) * (self.num_classes - 1)
+	    self.max_num_features = self.X_train.shape[1]
+	    self.max_timesteps = self.X_train.shape[-1]
+	    
+		if self.normalize_timeseries: self.normalize_dataset()
+
+	def normalize_dataset(self, x_tol=1e-8):
+		self.normalize_timeseries = True # set to True because it is now
 
 	    # scale the values
-	    if self.is_timeseries and self.normalize_timeseries:
-	        X_train_mean = self.X_train.mean()
-	        X_train_std = self.X_train.std()
+	    if self.is_timeseries:
+	        X_train_mean = self.X_train.mean(axis=-1)
+	        X_train_std = self.X_train.std(axis=-1)
 	        self.X_train = (self.X_train - X_train_mean) / (X_train_std + x_tol)
+	        self.X_test = (self.X_test - X_train_mean) / (X_train_std + x_tol)
+	    else:
+	    	X_train_mean = self.X_train.mean(axis=1)
+	        X_train_std = self.X_train.std(axis=1)
+	        self.X_train = (self.X_train - X_train_mean) / (X_train_std + x_tol)
+	        self.X_test = (self.X_test - X_train_mean) / (X_train_std + x_tol)
 
 	    if verbose: print("Finished processing train dataset..")
 
 	    # extract labels Y and normalize to [0 - (MAX - 1)] range
-	    # self.num_classes = len(np.unique(y_test))
-	    self.y_test = (self.y_test - self.y_test.min()) / (self.y_test.max() - self.y_test.min()) * (self.num_classes - 1)
+	    y_train_range = (self.y_train.max() - self.y_train.min())
+	    
+	    self.y_train -= self.y_train.min()
+	    self.y_train /= y_train_range
+	    self.y_train *= self.num_classes - 1
+	    
+	    # extract labels Y and normalize to [0 - (MAX - 1)] range
+	    # FINDME: Should we subtract the y_train.min() and divide
+	    #			by the y_train_range instead of y_test?
+	    y_test_range = (self.y_test.max() - self.y_test.min())
+	    
+	    self.y_test -= self.y_test.min()
+	    self.y_test /= y_test_range
+	    self.y_test *= self.num_classes - 1
 
-        # scale the values
-        if self.is_timeseries and self.normalize_timeseries:
-            self.X_test = (self.X_test - X_train_mean) / (X_train_std + x_tol)
-
-	    if verbose:
+        if verbose:
 	        print("Finished loading test dataset..")
 	        print()
 	        print("Number of train samples : ", self.X_train.shape[0])
@@ -310,7 +334,7 @@ class MLSTM_FCN(object):
 						use_tensorboard=True, loss='categorical_crossentropy', 
 						metrics=['accuracy']):
 
-		self.learning_rate = 1e-3
+		self.learning_rate = learning_rate
 
 	    self._classes = np.unique(self.y_train)
 	    self._lbl_enc = LabelEncoder()
@@ -323,8 +347,8 @@ class MLSTM_FCN(object):
 
 		    self._class_weight = recip_freq[self._lbl_enc.transform(self.classes)]
 		else:
-			self._class_weight = np.ones(self.y_train.size)
-
+			self._class_weight = np.ones(self.y_train.size) / self.num_classes
+		
 	    print("Class weights : ", self._class_weight)
 
 	    self.y_train = to_categorical(self.y_train, len(np.unique(self.y_train)))
