@@ -557,6 +557,8 @@ def main(model_type_name='', dataset_prefix='', n_train_samples=80,
 	ytrain = np.random.choice(classes,n_train_samples)
 	ytest = np.random.choice(classes,n_test_samples)
 	
+	print(set(ytrain) == set(ytest))
+	
 	time_stamp = time_stamp or int(time())
 	
 	save_filename = save_dir + '{}_{}_{}_save_model_class.joblib.save'.format(
@@ -584,8 +586,6 @@ def main(model_type_name='', dataset_prefix='', n_train_samples=80,
 
 	# instance.load_dataset(train_filename, test_filename, 
 	# 							normalize=True)
-	print(set(ytrain) == set(ytest))
-	
 	instance.load_dataset( xtrain=xtrain, ytrain=ytrain, 
 							xtest=xtest, ytest=ytest,
 							normalize=True)
