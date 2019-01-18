@@ -584,7 +584,8 @@ def main(model_type_name='', dataset_prefix='', n_train_samples=80,
 
 	# instance.load_dataset(train_filename, test_filename, 
 	# 							normalize=True)
-
+	print(set(ytrain) == set(ytest))
+	
 	instance.load_dataset( xtrain=xtrain, ytrain=ytrain, 
 							xtest=xtest, ytest=ytest,
 							normalize=True)
