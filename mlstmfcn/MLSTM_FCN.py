@@ -557,8 +557,6 @@ def main(model_type_name='', dataset_prefix='', n_train_samples=80,
 	ytrain = np.random.choice(classes,n_train_samples)
 	ytest = np.random.choice(classes,n_test_samples)
 	
-	print(set(ytrain) == set(ytest))
-	
 	time_stamp = time_stamp or int(time())
 	
 	save_filename = save_dir + '{}_{}_{}_save_model_class.joblib.save'.format(
@@ -663,6 +661,8 @@ def plasticc(	n_epochs = 1000, batch_size = 128,
 							normalize=True)
 
 	instance.create_model(**dataset_settings)
+	
+	print(set(ytrain) == set(ytest))
 	
 	instance.train_model(epochs=n_epochs, batch_size=batch_size)
 	instance.save_instance(save_filename)
