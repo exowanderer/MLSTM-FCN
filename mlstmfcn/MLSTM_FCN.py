@@ -617,6 +617,7 @@ def plasticc(	n_epochs = 1000, batch_size = 128,
 				model_type_name = 'mlstmfcn',
 				dataset_prefix = 'plasticc',
 				test_size = 0.2, time_stamp = None,
+				verbose = False,
 				data_filename = 'plasticc_training_dataset_array.joblib.save'):
 	import numpy as np
 	from mlstmfcn import MLSTM_FCN
