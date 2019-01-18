@@ -151,7 +151,8 @@ def squeeze_excite_block(tower,
 	return squeeze_excite
 
 class MLSTM_FCN(object):
-	def __init__(self, time_stamp=int(time()), verbose=False):
+	def __init__(self, dataset_prefix='rename_me_', time_stamp=int(time()), 
+						verbose=False):
 
 		# num_max_times = MAX_TIMESTEPS_LIST[DATASET_INDEX]
 		# num_max_var = MAX_NB_VARIABLES[DATASET_INDEX]
@@ -159,6 +160,7 @@ class MLSTM_FCN(object):
 		# self.num_classes = NB_CLASSES_LIST[DATASET_INDEX]
 		self.verbose = verbose
 		self.time_stamp = time_stamp
+		self.dataset_prefix = dataset_prefix 
 		self.trained_ = False
 
 	def create_model(self, 
@@ -340,7 +342,7 @@ class MLSTM_FCN(object):
 			print("Sequence length : ", self.X_train.shape[-1])
 
 	def train_model(self, epochs=50, batch_size=128, val_subset_size=None, 
-						cutoff=None, dataset_prefix='rename_me_', 
+						cutoff=None, 
 						dataset_fold_id=None, learning_rate=1e-3, 
 						monitor='loss', optimization_mode='auto', 
 						compute_class_weights=True, compile_model=True, 
@@ -351,7 +353,6 @@ class MLSTM_FCN(object):
 						logdir = './logs/log-{}',
 						weights_dir = './weights/'):
 
-		self.dataset_prefix = dataset_prefix
 		self.dataset_fold_id = dataset_fold_id
 
 		if '{}' in logdir: logdir.format(self.time_stamp)
@@ -577,8 +578,9 @@ def main(model_type_name='', dataset_prefix='', n_train_samples=80,
 							# Squeeze = True,  # Default
 
 	# Model 1
-	instance = MLSTM_FCN(verbose = verbose, 
-						 time_stamp = time_stamp)
+	instance = MLSTM_FCN(dataset_prefix=dataset_prefix, 
+						 time_stamp = time_stamp,
+						 verbose = verbose)
 
 	# instance.load_dataset(train_filename, test_filename, 
 	# 							normalize=True)
@@ -589,8 +591,7 @@ def main(model_type_name='', dataset_prefix='', n_train_samples=80,
 
 	instance.create_model(**dataset_settings)
 	
-	instance.train_model(epochs=n_epochs, batch_size=batch_size, 
-							dataset_prefix=dataset_prefix)
+	instance.train_model(epochs=n_epochs, batch_size=batch_size)
 
 	instance.evaluate_model(batch_size=batch_size)
 	instance.save_instance(save_filename)
