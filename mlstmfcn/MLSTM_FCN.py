@@ -592,9 +592,9 @@ def main(model_type_name='', dataset_prefix='', n_train_samples=80,
 	instance.create_model(**dataset_settings)
 	
 	instance.train_model(epochs=n_epochs, batch_size=batch_size)
+	instance.save_instance(save_filename)
 
 	instance.evaluate_model(batch_size=batch_size)
-	instance.save_instance(save_filename)
 
 	return instance
 
