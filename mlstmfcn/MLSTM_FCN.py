@@ -613,6 +613,49 @@ def main(model_type_name='', dataset_prefix='', n_train_samples=80,
 	# train_model(instance.model, X_train, y_train, X_test, y_test, is_timeseries, epochs=1000, batch_size=128)
 	# evaluate_model(instance.model, X_test, y_test, is_timeseries, batch_size=128)
 
+def plasticc(	n_epochs = 1000, batch_size = 128, 
+				model_type_name = 'mlstmfcn',
+				dataset_prefix = 'plasticc',
+				test_size = 0.2, time_stamp = None,
+				data_filename = 'plasticc_training_dataset_array.joblib.save'):
+	import numpy as np
+	from mlstmfcn import MLSTM_FCN
+	from time import time
+	from sklearn.model_selection import train_test_split
+
+	features, labels = joblib.load(data_filename)
+
+	idx_train, idx_test = train_test_split(np.arange(labels.size), 
+											test_size=test_size)
+
+	xtrain = features[idx_train]
+	ytrain = labels[idx_train]
+	xtest = features[idx_test]
+	ytest = labels[idx_test]
+
+	time_stamp = time_stamp or int(time())
+
+	save_filename = '{}_{}_{}_save_model_class.joblib.save'.format(
+								model_type_name, dataset_prefix, time_stamp)
+
+	instance = MLSTM_FCN(dataset_prefix=dataset_prefix, 
+						 time_stamp=time_stamp, 
+						 verbose=verbose)
+
+	instance.load_dataset( xtrain=xtrain, ytrain=ytrain, 
+							xtest=xtest, ytest=ytest,
+							normalize=True)
+
+	instance.create_model(**dataset_settings)
+	
+	instance.train_model(epochs=n_epochs, batch_size=batch_size)
+	instance.save_instance(save_filename)
+
+	instance.evaluate_model(batch_size=batch_size)
+	instance.save_instance(save_filename)
+
+	return instance
+
 if __name__ == '__main__':
 	from mlstmfcn import MLSTM_FCN, main
 	from time import time
