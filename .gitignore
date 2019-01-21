@@ -14,3 +14,9 @@ utils/*.pyc__pycache__
 *__pycache__*
 bak*
 MLSTM_FCN_class_orig.py
+*.save
+build
+dist
+deleteme
+logs*
+*egg*
