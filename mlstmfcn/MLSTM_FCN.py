@@ -161,6 +161,7 @@ class MLSTM_FCN(object):
 		self.verbose = verbose
 		self.time_stamp = time_stamp
 		self.dataset_prefix = dataset_prefix 
+		self.dataset_fold_id = None
 		self.trained_ = False
 
 	def create_model(self, 
@@ -247,7 +248,8 @@ class MLSTM_FCN(object):
 	def load_dataset(self, train_filename=None, test_filename=None,
 						xtrain=None, ytrain=None, xtest=None, ytest=None,
 						is_timeseries = True, normalize=True, 
-						verbose = False):
+						weights_dir = './weights/',
+						compute_class_weights=True, verbose = False):
 
 		if None in [train_filename, train_filename] \
 			and np.all([t is not None for t in [xtrain,ytrain,xtest,ytest]]):
@@ -255,7 +257,8 @@ class MLSTM_FCN(object):
 			train_filename = train_filename or 'Train Data Provided Directly'
 			test_filename = test_filename or 'Test Data Provided Directly'
 
-			if isinstances((xtrain,ytrain,xtest,ytest),(list,np.ndarray,tuple)):
+			if isinstances((xtrain,ytrain,xtest,ytest), \
+								(list,np.ndarray,tuple)):
 				self.X_train = xtrain
 				self.y_train = ytrain
 				self.X_test = xtest
@@ -281,6 +284,10 @@ class MLSTM_FCN(object):
 							 "\nor the file location where data is located "
 							 "(i.e. train_filename = str, test_filename = str)")
 
+		self._LabelEncoder = LabelEncoder()
+		self.y_train = self._LabelEncoder.fit_transform(self.y_train)
+		self.y_test = self._LabelEncoder.transform(self.y_test)
+
 		self.is_timeseries = is_timeseries
 		self.normalize = normalize
 		self.train_filename = train_filename
@@ -288,6 +295,7 @@ class MLSTM_FCN(object):
 
 		self.classes = np.unique(self.y_train)
 		self.num_classes = len(self.classes)
+		self.num_samples = len(self.y_train)
 		self.max_num_features = self.X_train.shape[1]
 		self.max_timesteps = self.X_train.shape[-1]
 		
@@ -295,97 +303,21 @@ class MLSTM_FCN(object):
 
 		if self.normalize: self.normalize_dataset()
 
-	def normalize_dataset(self, x_tol=1e-8, verbose = False):
-		self.normalize = True # set to True because it is now
-
-		# scale the values
-		if self.is_timeseries:
-			X_train_mean = self.X_train.mean(axis=0)
-			X_train_std = self.X_train.std(axis=0)
-			self.X_train = (self.X_train - X_train_mean) / (X_train_std + x_tol)
-			self.X_test = (self.X_test - X_train_mean) / (X_train_std + x_tol)
-		else:
-			X_train_mean = self.X_train.mean(axis=-1)
-			X_train_std = self.X_train.std(axis=-1)
-			self.X_train = (self.X_train - X_train_mean) / (X_train_std + x_tol)
-			self.X_test = (self.X_test - X_train_mean) / (X_train_std + x_tol)
-
-		if self.verbose or verbose: 
-			print("Finished processing train dataset..")
-
-		# extract labels Y and normalize to [0 - (MAX - 1)] range
-		self._y_train_min = self.y_train.min()
-		self._y_train_max = self.y_train.max()
-		self._y_train_range = (self._y_train_max - self._y_train_min)
-		
-		self.y_train = self.y_train - self._y_train_min
-		self.y_train = self.y_train / self._y_train_range
-		self.y_train = self.y_train * (self.num_classes - 1)
-		
-		# extract labels Y and normalize to [0 - (MAX - 1)] range
-		# FINDME: Should we subtract the y_train.min() and divide
-		#			by the y_train_range instead of y_test?
-		self._y_test_min = self.y_test.min()
-		self._y_test_max = self.y_test.max()
-		self._y_test_range = (self._y_test_max - self._y_test_min)
-		
-		self.y_test = self.y_test - self._y_test_min
-		self.y_test = self.y_test / self._y_test_range
-		self.y_test = self.y_test * (self.num_classes - 1)
-
-		if self.verbose or verbose:
-			print("Finished loading test dataset..")
-			print()
-			print("Number of train samples : ", self.X_train.shape[0])
-			print("Number of test samples : ", self.X_test.shape[0])
-			print("Number of classes : ", self.num_classes)
-			print("Sequence length : ", self.X_train.shape[-1])
-
-	def train_model(self, epochs=50, batch_size=128, val_subset_size=None, 
-						cutoff=None, 
-						dataset_fold_id=None, learning_rate=1e-3, 
-						monitor='loss', optimization_mode='auto', 
-						compute_class_weights=True, compile_model=True, 
-						optimizer=None, use_model_checkpoint=True, 
-						use_lr_reduce=True, use_tensorboard=True, 
-						use_early_stopping=True, metrics=['accuracy'], 
-						loss='categorical_crossentropy',
-						logdir = './logs/log-{}',
-						weights_dir = './weights/'):
-
-		self.dataset_fold_id = dataset_fold_id
-
-		if '{}' in logdir: logdir.format(self.time_stamp)
-
-		self.learning_rate = learning_rate
-
-		self._LabelEncoder = LabelEncoder()
-		
-		y_ind = self._LabelEncoder.fit_transform(self.y_train.ravel())
-		
-		if compute_class_weights:
-
-			len_train = len(self.y_train)
-			len_lbl_enc = len(self._LabelEncoder.classes_)
-			bincount_y_ind = np.bincount(y_ind).astype(np.float64)
-			
-			recip_freq = len_train / (len_lbl_enc * bincount_y_ind)
-
-			self.class_weights_ = recip_freq[
-									self._LabelEncoder.transform(self.classes)
-									]
-		else:
-			self.class_weights_ = np.ones(self.y_train.size) / self.num_classes
-
-		print("Class weights : ", self.class_weights_)
-
 		self.y_train = to_categorical(self.y_train, self.num_classes)
 		self.y_test = to_categorical(self.y_test, self.num_classes)
 
-		if self.is_timeseries:
-			factor = 1. / np.cbrt(2)
+		if compute_class_weights:
+			# len_lbl_enc = len(self._LabelEncoder.classes_)
+			sum_y_train = self.y_train.sum(axis=0)
+			
+			recip_freq = self.num_samples / (self.num_classes * sum_y_train)
+			self.class_weights_ = recip_freq
+			#[self._LabelEncoder.transform(self.classes)]
 		else:
-			factor = 1. / np.sqrt(2)
+			self.class_weights_ = np.ones(self.y_train.size) / self.num_classes
+
+		if verbose or self.verbose: 
+			print("Class weights : ", self.class_weights_)
 
 		if self.dataset_fold_id is None:
 			self.weight_fn = weights_dir + "{}_{}_weights.h5".format(
@@ -409,8 +341,76 @@ class MLSTM_FCN(object):
 			self.weight_fn = self.weight_fn.replace(old_fold, new_fold)
 
 			self.dataset_fold_id += 1
+
+	def normalize_dataset(self, x_tol=1e-8, verbose = False):
+		self.normalize = True # set to True because it is now
+
+		# scale the values
+		if self.is_timeseries:
+			X_train_mean = self.X_train.mean(axis=0)
+			X_train_std = self.X_train.std(axis=0)
+			self.X_train = (self.X_train - X_train_mean) / (X_train_std + x_tol)
+			self.X_test = (self.X_test - X_train_mean) / (X_train_std + x_tol)
+		else:
+			X_train_mean = self.X_train.mean(axis=-1)
+			X_train_std = self.X_train.std(axis=-1)
+			self.X_train = (self.X_train - X_train_mean) / (X_train_std + x_tol)
+			self.X_test = (self.X_test - X_train_mean) / (X_train_std + x_tol)
+
+		if self.verbose or verbose: 
+			print("Finished processing train dataset..")
+
+		# extract labels Y and normalize to [0 - (MAX - 1)] range
+		# self._y_train_min = self.y_train.min()
+		# self._y_train_max = self.y_train.max()
+		# self._y_train_range = (self._y_train_max - self._y_train_min)
 		
-		callback_list = []
+		# self.y_train = self.y_train - self._y_train_min
+		# self.y_train = self.y_train / self._y_train_range
+		# self.y_train = self.y_train * (self.num_classes - 1)
+		
+		# extract labels Y and normalize to [0 - (MAX - 1)] range
+		# FINDME: Should we subtract the y_train.min() and divide
+		#			by the y_train_range instead of y_test?
+		# self._y_test_min = self.y_test.min()
+		# self._y_test_max = self.y_test.max()
+		# self._y_test_range = (self._y_test_max - self._y_test_min)
+		
+		# self.y_test = self.y_test - self._y_test_min
+		# self.y_test = self.y_test / self._y_test_range
+		# self.y_test = self.y_test * (self.num_classes - 1)
+
+		if self.verbose or verbose:
+			print("Finished loading test dataset..")
+			print()
+			print("Number of train samples : ", self.X_train.shape[0])
+			print("Number of test samples : ", self.X_test.shape[0])
+			print("Number of classes : ", self.num_classes)
+			print("Sequence length : ", self.X_train.shape[-1])
+
+	def train_model(self, epochs=50, batch_size=128, val_subset_size=None, 
+						cutoff=None, dataset_fold_id=None, learning_rate=1e-3, 
+						monitor='loss', optimization_mode='auto', 
+						compile_model=True, optimizer=None, 
+						use_model_checkpoint=True, use_lr_reduce=True, 
+						use_tensorboard=True, use_early_stopping=True, 
+						metrics=['accuracy'], loss='categorical_crossentropy',
+						logdir = './logs/log-{}', callback_list=None):
+
+		self.dataset_fold_id = dataset_fold_id
+
+		if '{}' in logdir: logdir.format(self.time_stamp)
+
+		self.learning_rate = learning_rate
+
+		# y_ind = self._LabelEncoder.transform(self.y_train.ravel())
+		
+		if self.is_timeseries:
+			factor = 1. / np.cbrt(2)
+		else:
+			factor = 1. / np.sqrt(2)
+
+		callback_list = callback_list or []
 
 		if use_model_checkpoint:
 			abs_weight_path = os.path.dirname(os.path.abspath(self.weight_fn))
@@ -469,10 +469,12 @@ class MLSTM_FCN(object):
 			y_test_local = self.y_test
 
 		self.results_ = self.model.fit(self.X_train, self.y_train, 
-										batch_size=batch_size, epochs=epochs, 
-										callbacks=callback_list, verbose=2, 
-										class_weight=self.class_weights_, 
-										validation_data=(X_test_local, 
+										batch_size = batch_size, 
+										epochs = epochs, 
+										callbacks = callback_list, 
+										verbose = 2, 
+										class_weight = self.class_weights_, 
+										validation_data = (X_test_local, 
 															y_test_local))
 
 		self.trained_ = True
@@ -498,13 +500,6 @@ class MLSTM_FCN(object):
 		self.model.compile(	optimizer=optimizer, 
 						loss='categorical_crossentropy', 
 						metrics=['accuracy'])
-
-		# if dataset_fold_id is None:
-		# 	self.weight_fn = "./weights/{}_weights.h5".format(
-		# 							self.dataset_prefix)
-		# else:
-		# 	self.weight_fn = "./weights/{}_fold_{}_weights.h5".format(
-		# 							self.dataset_prefix, self.dataset_fold_id)
 
 		self.model.load_weights(self.weight_fn)
 
@@ -539,24 +534,30 @@ class MLSTM_FCN(object):
 	def load_instance(self, load_filename):
 		self.__dict__ = joblib.load(load_filename)
 
-def main(model_type_name='', dataset_prefix='', n_train_samples=80, 
-			n_test_samples=20, n_features=20, n_timesteps=25, verbose=False,
+def main(model_type_name='', dataset_prefix='', n_samples=100, 
+			n_features=20, n_timesteps=25, verbose=False,
+			n_classes = 20, n_possible_classes=100, test_size=0.2,
 			x_mean=10, x_std=3, classes=[0,1,2,3], n_epochs=2, batch_size=128,
-			save_dir='./', time_stamp=None):
+			save_dir='./', time_stamp=None, seed=42):
 
 	import numpy as np
 
 	from mlstmfcn import MLSTM_FCN
 	from time import time
+	from sklearn.model_selection import train_test_split
 
-	xtrain = np.random.normal(x_mean,x_std,
-							(n_train_samples, n_features, n_timesteps))
-	xtest = np.random.normal(x_mean,x_std,
-							(n_test_samples, n_features, n_timesteps))
+	np.random.seed(seed)
+	classes = np.random.choice(np.arange(n_possible_classes), size=n_classes)
+	classes = np.array(['class{}'.format(c) for c in classes.astype(str)])
+
+	features = np.random.normal(x_mean, x_std, 
+				(n_samples, n_features, n_timesteps))
 	
-	ytrain = np.random.choice(classes,n_train_samples)
-	ytest = np.random.choice(classes,n_test_samples)
+	labels = np.random.choice(classes, features.shape[0])
 	
+	idx_train, idx_test = train_test_split(np.arange(len(labels)), 
+											test_size = test_size)
+		
 	time_stamp = time_stamp or int(time())
 	
 	save_filename = save_dir + '{}_{}_{}_save_model_class.joblib.save'.format(
@@ -582,20 +583,21 @@ def main(model_type_name='', dataset_prefix='', n_train_samples=80,
 						 time_stamp = time_stamp,
 						 verbose = verbose)
 
-	# instance.load_dataset(train_filename, test_filename, 
-	# 							normalize=True)
-	instance.load_dataset( xtrain=xtrain, ytrain=ytrain, 
-							xtest=xtest, ytest=ytest,
-							normalize=True)
+	instance.load_dataset( 	xtrain = features[idx_train], 
+							xtest = features[idx_test], 
+							ytrain = labels[idx_train], 
+							ytest = labels[idx_test], 
+							normalize = True,
+							compute_class_weights=True)
 
 	instance.create_model(**dataset_settings)
 	
 	instance.train_model(epochs=n_epochs, batch_size=batch_size)
-	instance.save_instance(save_filename)
+	instance.save_instance(save_filename=save_filename)	
 
 	instance.evaluate_model(batch_size=batch_size)
 
-	return instance
+	return instance, features, labels, idx_train, idx_test
 
 	# # Model 2
 	# instance2 = MLSTM_FCN(verbose=verbose)
@@ -618,20 +620,17 @@ def plasticc(	n_epochs = 1000, batch_size = 128,
 				test_size = 0.2, time_stamp = None,
 				verbose = False, dataset_settings = None,
 				data_filename = 'plasticc_training_dataset_array.joblib.save'):
+	
 	import numpy as np
 	from mlstmfcn import MLSTM_FCN
 	from time import time
 	from sklearn.model_selection import train_test_split
+	from sklearn.externals import joblib
 
 	features, labels = joblib.load(data_filename)
 
 	idx_train, idx_test = train_test_split(np.arange(labels.size), 
 											test_size=test_size)
-
-	xtrain = features[idx_train]
-	ytrain = labels[idx_train]
-	xtest = features[idx_test]
-	ytest = labels[idx_test]
 
 	time_stamp = time_stamp or int(time())
 
@@ -656,13 +655,13 @@ def plasticc(	n_epochs = 1000, batch_size = 128,
 						 time_stamp=time_stamp, 
 						 verbose=verbose)
 
-	instance.load_dataset( xtrain=xtrain, ytrain=ytrain, 
-							xtest=xtest, ytest=ytest,
-							normalize=True)
+	instance.load_dataset( 	xtrain = features[idx_train], 
+							xtest = features[idx_test], 
+							ytrain = labels[idx_train], 
+							ytest = labels[idx_test], 
+							normalize = True)
 
 	instance.create_model(**dataset_settings)
-	
-	print(set(ytrain) == set(ytest))
 	
 	instance.train_model(epochs=n_epochs, batch_size=batch_size)
 	instance.save_instance(save_filename)
@@ -680,7 +679,7 @@ if __name__ == '__main__':
 	dataset_prefix = 'plasticc'
 	batch_size = 128
 
-	instance1 = main(model_type_name, 
+	instance1,_,_,_,_ = main(model_type_name, 
 					dataset_prefix=dataset_prefix, 
 					verbose=True)
 
