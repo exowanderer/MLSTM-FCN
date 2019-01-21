@@ -155,11 +155,7 @@ def squeeze_excite_block(tower,
 class MLSTM_FCN(object):
 	def __init__(self, dataset_prefix='rename_me_', time_stamp=int(time()), 
 						verbose=False):
-
-		# num_max_times = MAX_TIMESTEPS_LIST[DATASET_INDEX]
-		# num_max_var = MAX_NB_VARIABLES[DATASET_INDEX]
-		
-		# self.num_classes = NB_CLASSES_LIST[DATASET_INDEX]
+	
 		self.verbose = verbose
 		self.time_stamp = time_stamp
 		self.dataset_prefix = dataset_prefix 
@@ -301,10 +297,10 @@ class MLSTM_FCN(object):
 		self.classes = np.unique(self.y_train)
 		self.num_classes = len(self.classes)
 		self.num_samples = len(self.y_train)
-		self.max_num_features = self.X_train.shape[1]
-		self.max_timesteps = self.X_train.shape[-1]
+		self.num_features = self.X_train.shape[1]
+		self.num_timesteps = self.X_train.shape[-1]
 		
-		self.input_shape = (self.max_num_features, self.max_timesteps)
+		self.input_shape = (self.num_features, self.num_timesteps)
 
 		if self.normalize: self.normalize_dataset()
 
@@ -394,7 +390,8 @@ class MLSTM_FCN(object):
 			print("Number of train samples : ", self.X_train.shape[0])
 			print("Number of test samples : ", self.X_test.shape[0])
 			print("Number of classes : ", self.num_classes)
-			print("Sequence length : ", self.X_train.shape[-1])
+			print("Number of features : ", self.num_features)
+			print("Sequence length : ", self.num_timesteps)
 
 	def train_model(self, epochs=50, batch_size=128, val_subset_size=None, 
 						cutoff=None, dataset_fold_id=None, learning_rate=1e-3, 
