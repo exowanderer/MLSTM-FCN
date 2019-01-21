@@ -399,8 +399,11 @@ class MLSTM_FCN(object):
 
 		self.dataset_fold_id = dataset_fold_id
 
-		if '{}' in logdir: logdir.format(self.time_stamp)
+		if '{}' in logdir: 
+			logdir = logdir.format(self.time_stamp)
 
+		print(logdir)
+		
 		self.learning_rate = learning_rate
 
 		# y_ind = self._LabelEncoder.transform(self.y_train.ravel())
