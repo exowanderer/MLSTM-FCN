@@ -3,9 +3,9 @@ from keras.layers import Input, Dense, LSTM, multiply, concatenate, Activation, 
 from keras.layers import Conv1D, BatchNormalization, GlobalAveragePooling1D, Permute, Dropout
 from keras.regularizers import l2
 
-from utils.constants import MAX_NB_VARIABLES, NB_CLASSES_LIST, MAX_TIMESTEPS_LIST
-from utils.keras_utils import train_model, evaluate_model, set_trainable
-from utils.layer_utils import AttentionLSTM
+from mlstmfcn.utils.constants import MAX_NB_VARIABLES, NB_CLASSES_LIST, MAX_TIMESTEPS_LIST
+from mlstmfcn.utils.keras_utils import train_model, evaluate_model, set_trainable
+from mlstmfcn.utils.layer_utils import AttentionLSTM
 
 DATASET_INDEX = 5
 

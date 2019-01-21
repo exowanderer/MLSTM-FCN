@@ -20,3 +20,5 @@ dist
 deleteme
 logs*
 *egg*
+*.npy
+*.mat

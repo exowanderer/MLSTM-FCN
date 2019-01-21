@@ -2,9 +2,9 @@ from keras.models import Model
 from keras.layers import Input, Dense, LSTM, multiply, concatenate, Activation, Masking, Reshape
 from keras.layers import Conv1D, BatchNormalization, GlobalAveragePooling1D, Permute, Dropout
 
-from utils.constants import MAX_NB_VARIABLES, NB_CLASSES_LIST, MAX_TIMESTEPS_LIST
-from utils.keras_utils import train_model, evaluate_model, set_trainable
-from utils.layer_utils import AttentionLSTM
+from mlstmfcn.utils.constants import MAX_NB_VARIABLES, NB_CLASSES_LIST, MAX_TIMESTEPS_LIST
+from mlstmfcn.utils.keras_utils import train_model, evaluate_model, set_trainable
+from mlstmfcn.utils.layer_utils import AttentionLSTM
 
 DATASET_INDEX = 43
 
@@ -193,6 +193,6 @@ def squeeze_excite_block(input):
 if __name__ == "__main__":
     model = generate_model_2()
 
-    # train_model(model, DATASET_INDEX, dataset_prefix='lp3_', epochs=1000, batch_size=128)
+    train_model(model, DATASET_INDEX, dataset_prefix='lp3_', epochs=1000, batch_size=128)
 
     evaluate_model(model, DATASET_INDEX, dataset_prefix='lp3_', batch_size=128)

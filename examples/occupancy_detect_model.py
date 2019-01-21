@@ -2,9 +2,9 @@ from keras.models import Model
 from keras.layers import Input, Dense, LSTM, multiply, concatenate, Activation, Masking, Reshape
 from keras.layers import Conv1D, BatchNormalization, GlobalAveragePooling1D, Permute, Dropout
 
-from utils.constants import MAX_NB_VARIABLES, NB_CLASSES_LIST, MAX_TIMESTEPS_LIST
-from utils.keras_utils import train_model, evaluate_model, set_trainable, f1_score
-from utils.layer_utils import AttentionLSTM
+from mlstmfcn.utils.constants import MAX_NB_VARIABLES, NB_CLASSES_LIST, MAX_TIMESTEPS_LIST
+from mlstmfcn.utils.keras_utils import train_model, evaluate_model, set_trainable, f1_score
+from mlstmfcn.utils.layer_utils import AttentionLSTM
 
 import os
 import numpy as np
@@ -27,9 +27,9 @@ from keras.preprocessing.sequence import pad_sequences
 from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
 from keras import backend as K
 
-from utils.generic_utils import load_dataset_at, calculate_dataset_metrics, cutoff_choice, \
+from mlstmfcn.utils.generic_utils import load_dataset_at, calculate_dataset_metrics, cutoff_choice, \
                                 cutoff_sequence
-from utils.constants import MAX_NB_VARIABLES, MAX_TIMESTEPS_LIST
+from mlstmfcn.utils.constants import MAX_NB_VARIABLES, MAX_TIMESTEPS_LIST
 import numpy as np
 from sklearn import metrics
 
