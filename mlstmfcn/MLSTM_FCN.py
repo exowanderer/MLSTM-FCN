@@ -619,7 +619,7 @@ def plasticc(	n_epochs = 1000, batch_size = 128,
 				dataset_prefix = 'plasticc',
 				test_size = 0.2, time_stamp = None,
 				verbose = False, dataset_settings = None,
-				data_filename = 'plasticc_training_dataset_array.joblib.save'):
+				data_filename = None, return_all=False):
 	
 	import numpy as np
 	from mlstmfcn import MLSTM_FCN
@@ -636,6 +636,9 @@ def plasticc(	n_epochs = 1000, batch_size = 128,
 
 	save_filename = '{}_{}_{}_save_model_class.joblib.save'.format(
 								model_type_name, dataset_prefix, time_stamp)
+
+	data_filename = data_filename or \
+						'plasticc_training_dataset_array.joblib.save'
 
 	dataset_settings = dataset_settings or \
 						dict(n_lstm_cells = 8, 
@@ -669,7 +672,10 @@ def plasticc(	n_epochs = 1000, batch_size = 128,
 	instance.evaluate_model(batch_size=batch_size)
 	instance.save_instance(save_filename)
 
-	return instance
+	if return_all:
+		return instance, features, labels, idx_train, idx_test
+	else:
+		return instance
 
 if __name__ == '__main__':
 	from mlstmfcn import MLSTM_FCN, main
