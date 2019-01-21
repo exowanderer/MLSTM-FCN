@@ -109,6 +109,49 @@ def isinstances(list_of_inputs, list_of_instances, condition='and'):
 
 	return conditon_all
 
+def load_data_switch(data_filename):
+	if data_filename[-1] == '/': 
+		X_train = np.load(data_filename+'X_train.npy')
+		y_train = np.load(data_filename+'y_train.npy')
+
+		X_test = np.load(data_filename+'X_test.npy')
+		y_test = np.load(data_filename+'y_test.npy')
+	elif '.joblib.save' in data_filename:
+		features, labels = joblib.load(data_filename)
+		idx_train, idx_test = train_test_split(np.arange(len(labels)), 
+												test_size = test_size)
+		X_train = features[idx_train]
+		y_train = labels[idx_train]
+
+		X_test = features[idx_test]
+		y_train = labels[idx_test]
+	elif '.npy' in data_filename:
+		'''
+			Example: if data_filane = 'X_train.npy'
+			then data_filename.replace('y','X').replace('test','train') 
+			is irrelevant; but data_filename.replace('y','X').replace('train','test')
+			is critical. There is always one out of four that will be irrlevant
+
+		'''
+		X_train = np.load(data_filename.replace('y','X').replace('test','train'))
+		y_train = np.load(data_filename.replace('X','y').replace('test','train'))
+
+		X_test = np.load(data_filename.replace('y','X').replace('train','test'))
+		y_test = np.load(data_filename.replace('X','y').replace('train','test'))
+	else:
+		raise ValueError("`data_filename` must end in either a directory `'/'`"
+							" or `.npy` or `.joblib.save`"
+							"\nIf ending in directory, then files X_train.npy,"
+							" y_train.npy, X_test.npy, y_train.npy must exist"
+							" in that directory."
+							"\nIf ending in `.joblib.save`, then data file "
+							" will be loaded as features, labels joblib.load()"
+							"\nIf ending in `.npy`, then files X_train.npy,"
+							" y_train.npy, X_test.npy, y_train.npy are all"
+							" assumed to be in the same directory")
+	
+	return X_train, y_train, X_test, y_test
+
 def Conv1D_Stack(input_stack, conv1d_depth, conv1d_kernel, 
 				activation_func, local_initializer):
 	
@@ -246,15 +289,16 @@ class MLSTM_FCN(object):
 		
 		# add load model code ere to fine-tune
 
-	def load_dataset(self, train_filename=None, test_filename=None,
+	def load_dataset(self, data_filename=None, 
 						xtrain=None, ytrain=None, xtest=None, ytest=None,
 						is_timeseries = True, normalize=True, 
-						weights_dir = './weights/',
-						compute_class_weights=True, verbose = False):
+						weights_dir = './weights/', compute_class_weights=True,
+						verbose = False):
 
-		if None in [train_filename, train_filename] \
-			and np.all([t is not None for t in [xtrain,ytrain,xtest,ytest]]):
+		# Check if data is provided directly: i.e. no `None`s
+		data_chk = np.all([t is not None for t in [xtrain,ytrain,xtest,ytest]])
 
+		if data_filename is None and data_chk:
 			train_filename = train_filename or 'Train Data Provided Directly'
 			test_filename = test_filename or 'Test Data Provided Directly'
 
@@ -277,13 +321,13 @@ class MLSTM_FCN(object):
 				raise FileNotFoundError('File {} not found!'.format(\
 											self.test_filename))
 
-			self.X_train, self.y_train = joblib.load(self.train_filename)
-			self.X_test, self.y_test = joblib.load(self.test_filename)
+			self.X_train, self.y_train, self.X_test, self.y_test = 
+												load_data_switch(data_filename)
 		else:
 			raise ValueError("User must either provide data directly "
 							"(i.e. xtrain=ndarray, ytrain=array, ...), "
 							"\nor the file location where data is located "
-							"(i.e. train_filename = str, test_filename = str)")
+							"(i.e. data_filename = str)")
 
 		self._LabelEncoder = LabelEncoder()
 		self.y_train = self._LabelEncoder.fit_transform(self.y_train)
@@ -647,76 +691,6 @@ def main(model_type_name='', dataset_prefix='', n_samples=100,
 	instance.evaluate_model(batch_size=batch_size)
 
 	return instance, features, labels, idx_train, idx_test
-
-def plasticc(	n_epochs = 500, batch_size = 256, 
-				model_type_name = 'mlstmfcn',
-				dataset_prefix = 'plasticc',
-				test_size = 0.2, time_stamp = None,
-				verbose = False, dataset_settings = None,
-				data_filename = None, Attention=False,
-				Squeeze=True, return_all=False,
-				use_early_stopping=False):
-	
-	import numpy as np
-	from mlstmfcn import MLSTM_FCN
-	from time import time
-	from sklearn.model_selection import train_test_split
-	from sklearn.externals import joblib
-
-	features, labels = joblib.load(data_filename)
-
-	idx_train, idx_test = train_test_split(np.arange(labels.size), 
-											test_size=test_size)
-
-	time_stamp = time_stamp or int(time())
-
-	save_filename = '{}_{}_{}_save_model_class.joblib.save'.format(
-								model_type_name, dataset_prefix, time_stamp)
-
-	data_filename = data_filename or \
-						'plasticc_training_dataset_array.joblib.save'
-
-	dataset_settings = dataset_settings or \
-						dict(n_lstm_cells = 8, 
-							dropout_rate = 0.8, 
-							permute_dims = (2,1), 
-							conv1d_depths = [128, 256, 128], 
-							conv1d_kernels = [8, 5, 3], 
-							local_initializer = 'he_uniform', 
-							activation_func = 'relu', 
-							squeeze_ratio = 16, 
-							logit_output = 'sigmoid', 
-							squeeze_initializer = 'he_normal', 
-							use_bias = False,
-							verbose = verbose,
-							Attention = Attention, 
-							Squeeze = Squeeze)
-
-	instance = MLSTM_FCN(dataset_prefix=dataset_prefix, 
-						 time_stamp=time_stamp, 
-						 verbose=verbose)
-
-	instance.load_dataset( 	xtrain = features[idx_train], 
-							xtest = features[idx_test], 
-							ytrain = labels[idx_train], 
-							ytest = labels[idx_test], 
-							normalize = False)
-
-	instance.create_model(**dataset_settings)
-	
-	instance.train_model(epochs=n_epochs, 
-						 batch_size=batch_size,
-						 use_early_stopping=use_early_stopping)
-	
-	instance.save_instance(save_filename)
-
-	instance.evaluate_model(batch_size=batch_size)
-	instance.save_instance(save_filename)
-
-	if return_all:
-		return instance, features, labels, idx_train, idx_test
-	else:
-		return instance
 
 if __name__ == '__main__':
 	from mlstmfcn import MLSTM_FCN, main

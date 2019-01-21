@@ -1,198 +1,66 @@
-from keras.models import Model
-from keras.layers import Input, Dense, LSTM, multiply, concatenate, Activation, Masking, Reshape
-from keras.layers import Conv1D, BatchNormalization, GlobalAveragePooling1D, Permute, Dropout
+import numpy as np
+from mlstmfcn import MLSTM_FCN
+from time import time
+from sklearn.model_selection import train_test_split
+from sklearn.externals import joblib
 
-from mlstmfcn.utils.constants import MAX_NB_VARIABLES, NB_CLASSES_LIST, MAX_TIMESTEPS_LIST
-from mlstmfcn.utils.keras_utils import train_model, evaluate_model, set_trainable
-from mlstmfcn.utils.layer_utils import AttentionLSTM
+def weasel_lp3(n_epochs = 1000, batch_size = 128, 
+		model_type_name = 'mlstmfcn',
+		dataset_prefix = 'weasel_lp3',
+		test_size = 0.2, time_stamp = None,
+		verbose = False, dataset_settings = None,
+		data_filename = None, Attention=True,
+		Squeeze=True, return_all=False,
+		use_early_stopping=False):
 
-DATASET_INDEX = 43
+	time_stamp = time_stamp or int(time())
 
-MAX_TIMESTEPS = MAX_TIMESTEPS_LIST[DATASET_INDEX]
-MAX_NB_VARIABLES = MAX_NB_VARIABLES[DATASET_INDEX]
-NB_CLASS = NB_CLASSES_LIST[DATASET_INDEX]
+	save_filename = '{}_{}_{}_save_model_class.joblib.save'.format(
+								model_type_name, dataset_prefix, time_stamp)
 
-TRAINABLE = True
+	data_filename = data_filename or \
+						'data/WEASEL_MUSE_DATASETS/lp3/'
 
+	dataset_settings = dataset_settings or \
+						dict(n_lstm_cells = 8, 
+							dropout_rate = 0.8, 
+							permute_dims = (2,1), 
+							conv1d_depths = [128, 256, 128], 
+							conv1d_kernels = [8, 5, 3], 
+							local_initializer = 'he_uniform', 
+							activation_func = 'relu', 
+							squeeze_ratio = 16, 
+							logit_output = 'sigmoid', 
+							squeeze_initializer = 'he_normal', 
+							use_bias = False,
+							verbose = verbose,
+							Attention = Attention, 
+							Squeeze = Squeeze)
 
-def generate_model():
-    ip = Input(shape=(MAX_NB_VARIABLES, MAX_TIMESTEPS))
+	instance = MLSTM_FCN(dataset_prefix=dataset_prefix, 
+						 time_stamp=time_stamp, 
+						 verbose=verbose)
 
-    x = Masking()(ip)
-    x = LSTM(8)(x)
-    x = Dropout(0.8)(x)
+	instance.load_dataset( 	xtrain = features[idx_train], 
+							xtest = features[idx_test], 
+							ytrain = labels[idx_train], 
+							ytest = labels[idx_test], 
+							normalize = False)
 
-    y = Permute((2, 1))(ip)
-    y = Conv1D(128, 8, padding='same', kernel_initializer='he_uniform')(y)
-    y = BatchNormalization()(y)
-    y = Activation('relu')(y)
-    y = squeeze_excite_block(y)
+	instance.create_model(**dataset_settings)
+	
+	instance.train_model(epochs=n_epochs, 
+						 batch_size=batch_size,
+						 use_early_stopping=use_early_stopping)
+	
+	instance.save_instance(save_filename)
 
-    y = Conv1D(256, 5, padding='same', kernel_initializer='he_uniform')(y)
-    y = BatchNormalization()(y)
-    y = Activation('relu')(y)
-    y = squeeze_excite_block(y)
+	instance.evaluate_model(batch_size=batch_size)
+	instance.save_instance(save_filename)
 
-    y = Conv1D(128, 3, padding='same', kernel_initializer='he_uniform')(y)
-    y = BatchNormalization()(y)
-    y = Activation('relu')(y)
+	if return_all:
+		return instance, features, labels, idx_train, idx_test
+	else:
+		return instance
 
-    y = GlobalAveragePooling1D()(y)
-
-    x = concatenate([x, y])
-
-    out = Dense(NB_CLASS, activation='softmax')(x)
-
-    model = Model(ip, out)
-    model.summary()
-
-    # add load model code here to fine-tune
-
-    return model
-
-
-def generate_model_2():
-    ip = Input(shape=(MAX_NB_VARIABLES, MAX_TIMESTEPS))
-    # stride = 10
-
-    # x = Permute((2, 1))(ip)
-    # x = Conv1D(MAX_NB_VARIABLES // stride, 8, strides=stride, padding='same', activation='relu', use_bias=False,
-    #            kernel_initializer='he_uniform')(x)  # (None, variables / stride, timesteps)
-    # x = Permute((2, 1))(x)
-
-    #ip1 = K.reshape(ip,shape=(MAX_TIMESTEPS,MAX_NB_VARIABLES))
-    #x = Permute((2, 1))(ip)
-    x = Masking()(ip)
-    x = AttentionLSTM(8)(x)
-    x = Dropout(0.8)(x)
-
-    y = Permute((2, 1))(ip)
-    y = Conv1D(128, 8, padding='same', kernel_initializer='he_uniform')(y)
-    y = BatchNormalization()(y)
-    y = Activation('relu')(y)
-    y = squeeze_excite_block(y)
-
-    y = Conv1D(256, 5, padding='same', kernel_initializer='he_uniform')(y)
-    y = BatchNormalization()(y)
-    y = Activation('relu')(y)
-    y = squeeze_excite_block(y)
-
-    y = Conv1D(128, 3, padding='same', kernel_initializer='he_uniform')(y)
-    y = BatchNormalization()(y)
-    y = Activation('relu')(y)
-
-    y = GlobalAveragePooling1D()(y)
-
-    x = concatenate([x, y])
-
-    out = Dense(NB_CLASS, activation='softmax')(x)
-
-    model = Model(ip, out)
-    model.summary()
-
-    # add load model code here to fine-tune
-
-    return model
-
-def generate_model_3():
-    ip = Input(shape=(MAX_NB_VARIABLES, MAX_TIMESTEPS))
-
-    x = Masking()(ip)
-    x = LSTM(8)(x)
-    x = Dropout(0.8)(x)
-
-    y = Permute((2, 1))(ip)
-    y = Conv1D(128, 8, padding='same', kernel_initializer='he_uniform')(y)
-    y = BatchNormalization()(y)
-    y = Activation('relu')(y)
-    #y = squeeze_excite_block(y)
-
-    y = Conv1D(256, 5, padding='same', kernel_initializer='he_uniform')(y)
-    y = BatchNormalization()(y)
-    y = Activation('relu')(y)
-    #y = squeeze_excite_block(y)
-
-    y = Conv1D(128, 3, padding='same', kernel_initializer='he_uniform')(y)
-    y = BatchNormalization()(y)
-    y = Activation('relu')(y)
-
-    y = GlobalAveragePooling1D()(y)
-
-    x = concatenate([x, y])
-
-    out = Dense(NB_CLASS, activation='softmax')(x)
-
-    model = Model(ip, out)
-    model.summary()
-
-    # add load model code here to fine-tune
-
-    return model
-
-
-def generate_model_4():
-    ip = Input(shape=(MAX_NB_VARIABLES, MAX_TIMESTEPS))
-    # stride = 3
-    #
-    # x = Permute((2, 1))(ip)
-    # x = Conv1D(MAX_NB_VARIABLES // stride, 8, strides=stride, padding='same', activation='relu', use_bias=False,
-    #            kernel_initializer='he_uniform')(x)  # (None, variables / stride, timesteps)
-    # x = Permute((2, 1))(x)
-
-    x = Masking()(ip)
-    x = AttentionLSTM(8)(x)
-    x = Dropout(0.8)(x)
-
-    y = Permute((2, 1))(ip)
-    y = Conv1D(128, 8, padding='same', kernel_initializer='he_uniform')(y)
-    y = BatchNormalization()(y)
-    y = Activation('relu')(y)
-    #y = squeeze_excite_block(y)
-
-    y = Conv1D(256, 5, padding='same', kernel_initializer='he_uniform')(y)
-    y = BatchNormalization()(y)
-    y = Activation('relu')(y)
-    #y = squeeze_excite_block(y)
-
-    y = Conv1D(128, 3, padding='same', kernel_initializer='he_uniform')(y)
-    y = BatchNormalization()(y)
-    y = Activation('relu')(y)
-
-    y = GlobalAveragePooling1D()(y)
-
-    x = concatenate([x, y])
-
-    out = Dense(NB_CLASS, activation='softmax')(x)
-
-    model = Model(ip, out)
-    model.summary()
-
-    # add load model code here to fine-tune
-
-    return model
-
-def squeeze_excite_block(input):
-    ''' Create a squeeze-excite block
-    Args:
-        input: input tensor
-        filters: number of output filters
-        k: width factor
-
-    Returns: a keras tensor
-    '''
-    filters = input._keras_shape[-1] # channel_axis = -1 for TF
-
-    se = GlobalAveragePooling1D()(input)
-    se = Reshape((1, filters))(se)
-    se = Dense(filters // 16,  activation='relu', kernel_initializer='he_normal', use_bias=False)(se)
-    se = Dense(filters, activation='sigmoid', kernel_initializer='he_normal', use_bias=False)(se)
-    se = multiply([input, se])
-    return se
-
-
-if __name__ == "__main__":
-    model = generate_model_2()
-
-    train_model(model, DATASET_INDEX, dataset_prefix='lp3_', epochs=1000, batch_size=128)
-
-    evaluate_model(model, DATASET_INDEX, dataset_prefix='lp3_', batch_size=128)
+instance, features, labels, idx_train, idx_test = weasel_lp3()
