@@ -299,8 +299,7 @@ class MLSTM_FCN(object):
 		data_chk = np.all([t is not None for t in [xtrain,ytrain,xtest,ytest]])
 
 		if data_filename is None and data_chk:
-			train_filename = train_filename or 'Train Data Provided Directly'
-			test_filename = test_filename or 'Test Data Provided Directly'
+			data_filename = data_filename or 'Train Data Provided Directly'
 
 			if isinstances((xtrain,ytrain,xtest,ytest), \
 								(list,np.ndarray,tuple)):
@@ -308,20 +307,15 @@ class MLSTM_FCN(object):
 				self.y_train = ytrain
 				self.X_test = xtest
 				self.y_test = ytest
-		elif isinstances((train_filename, test_filename), (str)):
+		elif isinstance(data_filename, (str)):
 			if self.verbose or verbose:
-				print("Loading training data at: ", self.train_filename)
-				print("Loading testing data at: ", self.test_filename)
+				print("Loading data from: ", self.data_filename)
 
-			if not os.path.exists(train_filename):
+			if not os.path.exists(data_filename):
 				raise FileNotFoundError('File {} not found!'.format(\
-											self.train_filename))
+											data_filename))
 			
-			if not os.path.exists(test_filename):
-				raise FileNotFoundError('File {} not found!'.format(\
-											self.test_filename))
-
-			self.X_train, self.y_train, self.X_test, self.y_test = 
+			self.X_train, self.y_train, self.X_test, self.y_test = \
 												load_data_switch(data_filename)
 		else:
 			raise ValueError("User must either provide data directly "
@@ -335,8 +329,7 @@ class MLSTM_FCN(object):
 
 		self.is_timeseries = is_timeseries
 		self.normalize = normalize
-		self.train_filename = train_filename
-		self.test_filename = test_filename
+		self.data_filename = data_filename
 
 		self.classes = np.unique(self.y_train)
 		self.num_classes = len(self.classes)
