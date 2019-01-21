@@ -263,3 +263,63 @@ NB_CLASSES_LIST = [10, # 0
                    3, # 47
 
                    ]
+
+if __name__ == '__main__':
+  print('max_nb_vars\tmax_timesteps\tnum_classes\tdata_dir') 
+  from mlstmfcn.utils import constants as c
+  for max_nb_vars, max_timesteps, num_classes, data_dir in zip(c.MAX_NB_VARIABLES, c.MAX_TIMESTEPS_LIST, c.NB_CLASSES_LIST, c.TRAIN_FILES): 
+    if num_classes == 2: #binary
+    # if max_nb_vars == 2: # simple features
+    # if max_timesteps < 25: # small time axis
+      print('{}\t\t{}\t\t{}\t\t{}'.format(max_nb_vars, max_timesteps, num_classes, data_dir)) 
+'''
+max_nb_vars max_timesteps num_classes data_dir
+13    93    10    ../data/arabic/
+136   71    7   ../data/CK/
+30    173   20    ../data/character/
+570   100   20    ../data/Action3D/
+570   337   16    ../data/Activity/
+39    91    88    ../data/arabic_voice/
+12    26    9   ../data/JapaneseVowels/
+7   480   7   ../data/AREM/
+18    214   5   ../data/gesture_phase/
+11    5396    3   ../data/HT_Sensor/
+4   119   2   ../data/MovementAAL/
+9   128   6   ../data/HAR/
+5   3758    2   ../data/occupancy_detect/
+13    117   2   ../data/eeg/
+72    291   2   ../data/ozone/
+45    125   19    ../data/daily_sport/
+64    256   2   ../data/eeg2/
+23    42701   13    ../data/MHEALTH/
+6   896   2   ../data/EEG_Comp2_data1a/
+7   1152    2   ../data/EEG_Comp2_data1b/
+3   1152    2   ../data/EEG_Comp2_data3/
+28    500   2   ../data/EEG_Comp2_data4/
+64    7794    29    ../data/EEG_Comp3_data2/
+64    3000    2   ../data/EEG_Comp3_data1/
+3   315   8   ../data/uwave/
+77    24    18    ../data/opportunity/
+52    34    12    ../data/pamap2/
+13    93    10    ../data/WEASEL_MUSE_DATASETS/ArabicDigits/
+22    96    95    ../data/WEASEL_MUSE_DATASETS/AUSLAN/
+3   205   20    ../data/WEASEL_MUSE_DATASETS/CharacterTrajectories/
+62    534   2   ../data/WEASEL_MUSE_DATASETS/CMUsubject16/
+2   147   2   ../data/WEASEL_MUSE_DATASETS/ECG/
+12    26    9   ../data/WEASEL_MUSE_DATASETS/JapaneseVowels/
+62    761   2   ../data/WEASEL_MUSE_DATASETS/KickvsPunch/
+2   45    15    ../data/WEASEL_MUSE_DATASETS/Libras/
+4   994   2   ../data/WEASEL_MUSE_DATASETS/NetFlow/
+963   144   7   ../data/WEASEL_MUSE_DATASETS/PEMS/
+3   315   8   ../data/WEASEL_MUSE_DATASETS/UWave/
+6   198   2   ../data/WEASEL_MUSE_DATASETS/Wafer/
+62    1918    2   ../data/WEASEL_MUSE_DATASETS/WalkvsRun/
+2   97    4   ../data/WEASEL_MUSE_DATASETS/digitshape_random/
+6   15    4   ../data/WEASEL_MUSE_DATASETS/lp1/
+6   15    5   ../data/WEASEL_MUSE_DATASETS/lp2/
+6   15    4   ../data/WEASEL_MUSE_DATASETS/lp3/
+6   15    3   ../data/WEASEL_MUSE_DATASETS/lp4/
+6   15    5   ../data/WEASEL_MUSE_DATASETS/lp5/
+2   8   10    ../data/WEASEL_MUSE_DATASETS/pendigits/
+2   97    3   ../data/WEASEL_MUSE_DATASETS/shapes_random/
+'''
