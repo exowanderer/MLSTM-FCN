@@ -2,8 +2,6 @@ import os
 import tensorflow as tf
 import numpy as np
 
-# from .utils.constants import MAX_NB_VARIABLES, NB_CLASSES_LIST, MAX_TIMESTEPS_LIST
-# from .utils.keras_utils import train_model, evaluate_model, set_trainable
 from .utils.layer_utils import AttentionLSTM
 
 from keras.layers import Input, Dense, LSTM, Activation, Masking, Reshape
@@ -14,7 +12,8 @@ from keras.models import Model
 from keras.optimizers import Adam
 from keras.utils import to_categorical
 
-from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, TensorBoard, EarlyStopping
+from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
+from keras.callbacks import TensorBoard, EarlyStopping
 
 from sklearn.externals import joblib
 from sklearn.preprocessing import LabelEncoder
@@ -26,14 +25,16 @@ warnings.simplefilter('ignore', category=DeprecationWarning)
 
 class TrainValTensorboard(TensorBoard):
 	# Created from
-	#   https://stackoverflow.com/questions/47877475/keras-tensorboard-plot-train-and-validation-scalars-in-a-same-figure
+	#   https://stackoverflow.com/questions/47877475/
+	#	keras-tensorboard-plot-train-and-validation-scalars-in-a-same-figure
 	def __init__(self, log_dir='./logs', **kwargs):
 		
 		self.log_dir = log_dir
 
 		# Make the original `TensorBoard` log to a subdirectory 'training'
 		self.training_log_dir = os.path.join(self.log_dir, 'training')
-		super(TrainValTensorboard, self).__init__(self.training_log_dir, **kwargs)
+		super(TrainValTensorboard, self).__init__(self.training_log_dir, 
+														**kwargs)
 
 		# Log the validation metrics to a separate subdirectory
 		self.val_log_dir = os.path.join(log_dir, 'validation')
@@ -72,7 +73,8 @@ def isinstances(list_of_inputs, list_of_instances, condition='and'):
 	''' Checks if a list of inputs matches a list of types
 	Args:
 		list_of_inputs (list, tuple): list of inputs to be checked
-		list_of_instances (list, tuple): the list of instances to check if the inputs are amongst
+		list_of_instances (list, tuple): the list of instances 
+			to check if the inputs are amongst
 		condition (str; optional): can be `'and'` or '`or`', 
 			depending on how the user wants to combine the booleans
 	
@@ -84,7 +86,7 @@ def isinstances(list_of_inputs, list_of_instances, condition='and'):
 		>>> tuple1 = ('thing1', 'thing2')
 		>>> array1 = np.array([list1])
 		>>> isinstances([list1, list2, list3, array1, tuple1], \
-											(list, tuple, np.array), condition='and')
+									(list, tuple, np.array), condition='and')
 		
 		True # because all types are included in the list of instances
 		
@@ -186,14 +188,15 @@ class MLSTM_FCN(object):
 
 		''' Create the LSTM-RNN Tower for the MLSTM-FCN Architecture '''
 		if pre_convolve_rnn:
-			''' sabsample timesteps to prevent "Out-of-Memory Errors" due to the Attention LSTM's size '''
+			''' sabsample timesteps to prevent "Out-of-Memory Errors" 
+					due to the Attention LSTM's size '''
 
 			# permute to match Conv1D configuration
 			rnn_tower = Permute(permute_dims)(input_layer)
-			rnn_tower = Conv1D(self.input_shape[0] // stride, conv1d_kernels[0], 
-								strides=stride, padding='same', 
-								activation=activation_func, use_bias=use_bias,
-								kernel_initializer=local_initializer)(rnn_tower)
+			rnn_tower = Conv1D(self.input_shape[0]//stride, conv1d_kernels[0], 
+							strides=stride, padding='same', 
+							activation=activation_func, use_bias=use_bias,
+							kernel_initializer=local_initializer)(rnn_tower)
 
 			# re-permute to match LSTM configuration
 			rnn_tower = Permute(permute_dims)(rnn_tower)
@@ -213,8 +216,10 @@ class MLSTM_FCN(object):
 		''' Create the Convolution Tower for the MLSTM-FCN Architecture '''
 		conv1d_tower = Permute(permute_dims)(input_layer)
 
-		for kl, (conv1d_depth, conv1d_kernel) in enumerate(zip(conv1d_depths, conv1d_kernels)):
-			# Loop over all convolution kernel sizes and depths to create the Convolution Tower
+		zipper = zip(conv1d_depths, conv1d_kernels)
+		for kl, (conv1d_depth, conv1d_kernel) in enumerate(zipper):
+			# Loop over all convolution kernel sizes and depths 
+			#	to create the Convolution Tower
 			conv1d_tower = Conv1D_Stack(conv1d_tower, 
 										conv1d_depth = conv1d_depth, 
 										conv1d_kernel = conv1d_kernel, 
@@ -223,11 +228,11 @@ class MLSTM_FCN(object):
 
 			if Squeeze:
 				conv1d_tower = squeeze_excite_block(conv1d_tower, 
-											squeeze_ratio=squeeze_ratio, 
-											activation_func=activation_func, 
-											logit_output=logit_output, 
-											kernel_initializer=squeeze_initializer,
-											use_bias=use_bias)
+										squeeze_ratio=squeeze_ratio, 
+										activation_func=activation_func, 
+										logit_output=logit_output, 
+										kernel_initializer=squeeze_initializer,
+										use_bias=use_bias)
 
 			# Turn off Squeeze after the second to last layer
 			#	to avoid Squeezing at the last layer
@@ -280,9 +285,9 @@ class MLSTM_FCN(object):
 			self.X_test, self.y_test = joblib.load(self.test_filename)
 		else:
 			raise ValueError("User must either provide data directly "
-							 "(i.e. xtrain=ndarray, ytrain=array, ...), "
-							 "\nor the file location where data is located "
-							 "(i.e. train_filename = str, test_filename = str)")
+							"(i.e. xtrain=ndarray, ytrain=array, ...), "
+							"\nor the file location where data is located "
+							"(i.e. train_filename = str, test_filename = str)")
 
 		self._LabelEncoder = LabelEncoder()
 		self.y_train = self._LabelEncoder.fit_transform(self.y_train)
@@ -342,43 +347,46 @@ class MLSTM_FCN(object):
 
 			self.dataset_fold_id += 1
 
-	def normalize_dataset(self, x_tol=1e-8, verbose = False):
+	def normalize_dataset(self, x_tol=1e-8, normalize_labels=False, 
+							verbose=False):
+		
 		self.normalize = True # set to True because it is now
 
 		# scale the values
 		if self.is_timeseries:
 			X_train_mean = self.X_train.mean(axis=0)
 			X_train_std = self.X_train.std(axis=0)
-			self.X_train = (self.X_train - X_train_mean) / (X_train_std + x_tol)
-			self.X_test = (self.X_test - X_train_mean) / (X_train_std + x_tol)
+			self.X_train = (self.X_train - X_train_mean) / (X_train_std+x_tol)
+			self.X_test = (self.X_test - X_train_mean) / (X_train_std+x_tol)
 		else:
 			X_train_mean = self.X_train.mean(axis=-1)
 			X_train_std = self.X_train.std(axis=-1)
-			self.X_train = (self.X_train - X_train_mean) / (X_train_std + x_tol)
-			self.X_test = (self.X_test - X_train_mean) / (X_train_std + x_tol)
+			self.X_train = (self.X_train - X_train_mean) / (X_train_std+x_tol)
+			self.X_test = (self.X_test - X_train_mean) / (X_train_std+x_tol)
 
 		if self.verbose or verbose: 
 			print("Finished processing train dataset..")
 
-		# extract labels Y and normalize to [0 - (MAX - 1)] range
-		# self._y_train_min = self.y_train.min()
-		# self._y_train_max = self.y_train.max()
-		# self._y_train_range = (self._y_train_max - self._y_train_min)
-		
-		# self.y_train = self.y_train - self._y_train_min
-		# self.y_train = self.y_train / self._y_train_range
-		# self.y_train = self.y_train * (self.num_classes - 1)
-		
-		# extract labels Y and normalize to [0 - (MAX - 1)] range
-		# FINDME: Should we subtract the y_train.min() and divide
-		#			by the y_train_range instead of y_test?
-		# self._y_test_min = self.y_test.min()
-		# self._y_test_max = self.y_test.max()
-		# self._y_test_range = (self._y_test_max - self._y_test_min)
-		
-		# self.y_test = self.y_test - self._y_test_min
-		# self.y_test = self.y_test / self._y_test_range
-		# self.y_test = self.y_test * (self.num_classes - 1)
+		if normalize_labels:
+			# extract labels Y and normalize to [0 - (MAX - 1)] range
+			self._y_train_min = self.y_train.min()
+			self._y_train_max = self.y_train.max()
+			self._y_train_range = (self._y_train_max - self._y_train_min)
+			
+			self.y_train = self.y_train - self._y_train_min
+			self.y_train = self.y_train / self._y_train_range
+			self.y_train = self.y_train * (self.num_classes - 1)
+			
+			# extract labels Y and normalize to [0 - (MAX - 1)] range
+			# FINDME: Should we subtract the y_train.min() and divide
+			#			by the y_train_range instead of y_test?
+			self._y_test_min = self.y_test.min()
+			self._y_test_max = self.y_test.max()
+			self._y_test_range = (self._y_test_max - self._y_test_min)
+			
+			self.y_test = self.y_test - self._y_test_min
+			self.y_test = self.y_test / self._y_test_range
+			self.y_test = self.y_test * (self.num_classes - 1)
 
 		if self.verbose or verbose:
 			print("Finished loading test dataset..")
@@ -526,6 +534,49 @@ class MLSTM_FCN(object):
 
 		if return_all: return loss, accuracy
 
+	def predict(self):
+		assert(self.trained_), "Cannot evaluate a model "\
+							   "that has not been trained"
+
+		if ytest is not None:
+			self.y_test = ytest
+
+			if self.normalize_dataset:
+				self.y_test = self.y_test - self._y_test_min
+				self.y_test = self.y_test / self._y_test_range
+				self.y_test = self.y_test * (self.num_classes - 1)
+
+			self.y_test = to_categorical(self.y_test, self.num_classes)
+
+		optimizer = optimizer or Adam(lr=self.learning_rate)
+		self.model.compile(	optimizer=optimizer, 
+						loss='categorical_crossentropy', 
+						metrics=['accuracy'])
+
+		self.model.load_weights(self.weight_fn)
+
+		if test_subset_size is not None:
+			# This removes 20% of the data to be ignored until after training
+			#	should be done before this step; but it's here for completeness
+			y_test_idx = np.arange(self.y_test.size)
+			idx_test, idx_val = train_test_split(y_test_idx, 
+												test_size=test_subset_size)
+
+			X_test_local = self.X_test[idx_test]
+			y_test_local = self.y_test[idx_test]
+		else:
+			X_test_local = self.X_test
+			y_test_local = self.y_test
+
+		if self.verbose or verbose: print("\n[INFO] Predicting: ")
+		
+		prediction = self.model.predict(self.X_test)
+
+		prediction = prediction.argmax(axis=1)
+		prediction = self._LabelEncoder.inverse_transform(prediction)
+
+		return prediction
+
 	def save_instance(self, save_filename, verbose=False):
 		if self.verbose or verbose:
 			print('[INFO]: Saving Results to {}'.format(save_filename))
@@ -577,9 +628,9 @@ def main(model_type_name='', dataset_prefix='', n_samples=100,
 							logit_output = 'sigmoid', 
 							squeeze_initializer = 'he_normal', 
 							use_bias = False,
-							verbose = verbose)
-							# Attention = False, # Default
-							# Squeeze = True,  # Default
+							verbose = verbose,
+							Attention = False, 
+							Squeeze = True)
 
 	# Model 1
 	instance = MLSTM_FCN(dataset_prefix=dataset_prefix, 
@@ -602,27 +653,13 @@ def main(model_type_name='', dataset_prefix='', n_samples=100,
 
 	return instance, features, labels, idx_train, idx_test
 
-	# # Model 2
-	# instance2 = MLSTM_FCN(verbose=verbose)
-	# instance2.create_model(Attention=True, **dataset_settings)
-
-	# # Model 3
-	# instance3 = MLSTM_FCN(verbose=verbose)
-	# instance3.create_model(Squeeze=False, **dataset_settings)
-
-	# # Model 4
-	# instance4 = MLSTM_FCN(verbose=verbose)
-	# instance4.create_model(Attention=True, Squeeze=False, **dataset_settings)
-
-	# train_model(instance.model, X_train, y_train, X_test, y_test, is_timeseries, epochs=1000, batch_size=128)
-	# evaluate_model(instance.model, X_test, y_test, is_timeseries, batch_size=128)
-
 def plasticc(	n_epochs = 1000, batch_size = 128, 
 				model_type_name = 'mlstmfcn',
 				dataset_prefix = 'plasticc',
 				test_size = 0.2, time_stamp = None,
 				verbose = False, dataset_settings = None,
-				data_filename = None, return_all=False):
+				data_filename = None, Attention=False,
+				Squeeze=True, return_all=False):
 	
 	import numpy as np
 	from mlstmfcn import MLSTM_FCN
@@ -655,7 +692,9 @@ def plasticc(	n_epochs = 1000, batch_size = 128,
 							logit_output = 'sigmoid', 
 							squeeze_initializer = 'he_normal', 
 							use_bias = False,
-							verbose = verbose)
+							verbose = verbose,
+							Attention = Attention, 
+							Squeeze = Squeeze)
 
 	instance = MLSTM_FCN(dataset_prefix=dataset_prefix, 
 						 time_stamp=time_stamp, 
@@ -665,7 +704,7 @@ def plasticc(	n_epochs = 1000, batch_size = 128,
 							xtest = features[idx_test], 
 							ytrain = labels[idx_train], 
 							ytest = labels[idx_test], 
-							normalize = True)
+							normalize = False)
 
 	instance.create_model(**dataset_settings)
 	
