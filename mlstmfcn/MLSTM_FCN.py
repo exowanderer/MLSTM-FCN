@@ -648,13 +648,14 @@ def main(model_type_name='', dataset_prefix='', n_samples=100,
 
 	return instance, features, labels, idx_train, idx_test
 
-def plasticc(	n_epochs = 1000, batch_size = 128, 
+def plasticc(	n_epochs = 500, batch_size = 256, 
 				model_type_name = 'mlstmfcn',
 				dataset_prefix = 'plasticc',
 				test_size = 0.2, time_stamp = None,
 				verbose = False, dataset_settings = None,
 				data_filename = None, Attention=False,
-				Squeeze=True, return_all=False):
+				Squeeze=True, return_all=False,
+				use_early_stopping=False):
 	
 	import numpy as np
 	from mlstmfcn import MLSTM_FCN
@@ -703,7 +704,10 @@ def plasticc(	n_epochs = 1000, batch_size = 128,
 
 	instance.create_model(**dataset_settings)
 	
-	instance.train_model(epochs=n_epochs, batch_size=batch_size)
+	instance.train_model(epochs=n_epochs, 
+						 batch_size=batch_size,
+						 use_early_stopping=use_early_stopping)
+	
 	instance.save_instance(save_filename)
 
 	instance.evaluate_model(batch_size=batch_size)
