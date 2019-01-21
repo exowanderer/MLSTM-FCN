@@ -4,7 +4,7 @@ from time import time
 from sklearn.model_selection import train_test_split
 from sklearn.externals import joblib
 
-def weasel_lp3(n_epochs = 1000, batch_size = 128, 
+def weasel_lp3(n_epochs = 100, batch_size = 128, 
 		model_type_name = 'mlstmfcn',
 		dataset_prefix = 'weasel_lp3',
 		test_size = 0.2, time_stamp = None,
@@ -60,4 +60,4 @@ def weasel_lp3(n_epochs = 1000, batch_size = 128,
 	else:
 		return instance
 
-instance, features, labels, idx_train, idx_test = weasel_lp3()
+instance = weasel_lp3()
