@@ -41,8 +41,7 @@ def weasel_lp3(n_epochs = 1000, batch_size = 128,
 						 time_stamp=time_stamp, 
 						 verbose=verbose)
 
-	instance.load_dataset( 	data_filename = data_filename,
-							normalize = False)
+	instance.load_dataset( 	data_filename = data_filename, normalize = False)
 
 	instance.create_model(**dataset_settings)
 	
