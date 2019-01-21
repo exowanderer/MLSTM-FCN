@@ -155,7 +155,7 @@ def squeeze_excite_block(tower,
 class MLSTM_FCN(object):
 	def __init__(self, dataset_prefix='rename_me_', time_stamp=int(time()), 
 						verbose=False):
-	
+
 		self.verbose = verbose
 		self.time_stamp = time_stamp
 		self.dataset_prefix = dataset_prefix 
@@ -355,8 +355,8 @@ class MLSTM_FCN(object):
 			self.X_train = (self.X_train - X_train_mean) / (X_train_std+x_tol)
 			self.X_test = (self.X_test - X_train_mean) / (X_train_std+x_tol)
 		else:
-			X_train_mean = self.X_train.mean(axis=-1)
-			X_train_std = self.X_train.std(axis=-1)
+			X_train_mean = self.X_train.mean(axis=0)
+			X_train_std = self.X_train.std(axis=0)
 			self.X_train = (self.X_train - X_train_mean) / (X_train_std+x_tol)
 			self.X_test = (self.X_test - X_train_mean) / (X_train_std+x_tol)
 
@@ -407,8 +407,6 @@ class MLSTM_FCN(object):
 		if '{}' in logdir: 
 			logdir = logdir.format(self.time_stamp)
 
-		print(logdir)
-		
 		self.learning_rate = learning_rate
 
 		# y_ind = self._LabelEncoder.transform(self.y_train.ravel())
@@ -587,7 +585,7 @@ class MLSTM_FCN(object):
 
 def main(model_type_name='', dataset_prefix='', n_samples=100, 
 			n_features=20, n_timesteps=25, verbose=False,
-			n_classes = 20, n_possible_classes=100, test_size=0.2,
+			n_classes=20, n_possible_classes=100, test_size=0.2,
 			x_mean=10, x_std=3, classes=[0,1,2,3], n_epochs=2, batch_size=128,
 			save_dir='./', time_stamp=None, seed=42):
 
@@ -640,7 +638,7 @@ def main(model_type_name='', dataset_prefix='', n_samples=100,
 							ytest = labels[idx_test], 
 							normalize = True,
 							compute_class_weights=True)
-
+	return instance, features, labels, idx_train, idx_test
 	instance.create_model(**dataset_settings)
 	
 	instance.train_model(epochs=n_epochs, batch_size=batch_size)
