@@ -6,14 +6,13 @@ from mlstmfcn.utils.constants import MAX_NB_VARIABLES, NB_CLASSES_LIST, MAX_TIME
 from mlstmfcn.utils.keras_utils import train_model, evaluate_model, set_trainable
 from mlstmfcn.utils.layer_utils import AttentionLSTM
 
-DATASET_INDEX = 27
+DATASET_INDEX = 43
 
 MAX_TIMESTEPS = MAX_TIMESTEPS_LIST[DATASET_INDEX]
 MAX_NB_VARIABLES = MAX_NB_VARIABLES[DATASET_INDEX]
 NB_CLASS = NB_CLASSES_LIST[DATASET_INDEX]
 
 TRAINABLE = True
-
 
 def generate_model():
     ip = Input(shape=(MAX_NB_VARIABLES, MAX_TIMESTEPS))
@@ -189,10 +188,12 @@ def squeeze_excite_block(input):
     se = multiply([input, se])
     return se
 
-
 if __name__ == "__main__":
+    from time import time
+
     model = generate_model_2()
+    
+    train_model(model, DATASET_INDEX, dataset_prefix='lp3_', epochs=100, 
+                        batch_size=128)
 
-    # train_model(model, DATASET_INDEX, dataset_prefix='arabic_voice_', epochs=1000, batch_size=128)
-
-    evaluate_model(model, DATASET_INDEX, dataset_prefix='arabic_voice_', batch_size=128)
+    evaluate_model(model, DATASET_INDEX, dataset_prefix='lp3_', batch_size=128)
