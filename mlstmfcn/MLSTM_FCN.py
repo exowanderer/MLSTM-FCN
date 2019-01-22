@@ -694,7 +694,7 @@ if __name__ == '__main__':
 
 	model_type_name = 'mlstm_fcn'
 	dataset_prefix = 'plasticc'
-	batch_size = 128
+	batch_size = 256
 
 	instance1 = main(model_type_name, 
 					 dataset_prefix=dataset_prefix, 
