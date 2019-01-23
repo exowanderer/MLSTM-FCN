@@ -624,7 +624,7 @@ def main(model_type_name='', dataset_prefix='', n_samples=100,
 			n_features=20, n_timesteps=25, verbose=False,
 			n_classes=20, n_possible_classes=100, test_size=0.2,
 			x_mean=10, x_std=3, classes=[0,1,2,3], n_epochs=2, batch_size=128,
-			save_dir='./', time_stamp=None, seed=42):
+			save_dir='./', time_stamp=None, seed=42, return_all=True):
 
 	import numpy as np
 
@@ -683,7 +683,10 @@ def main(model_type_name='', dataset_prefix='', n_samples=100,
 
 	instance.evaluate_model(batch_size=batch_size)
 
-	return instance, features, labels, idx_train, idx_test
+	if return_all:
+		return instance, features, labels, idx_train, idx_test
+	else:
+		return instance
 
 if __name__ == '__main__':
 	from mlstmfcn import MLSTM_FCN, main
@@ -691,11 +694,11 @@ if __name__ == '__main__':
 
 	model_type_name = 'mlstm_fcn'
 	dataset_prefix = 'plasticc'
-	batch_size = 128
+	batch_size = 256
 
-	instance1,_,_,_,_ = main(model_type_name, 
-					dataset_prefix=dataset_prefix, 
-					verbose=True)
+	instance1 = main(model_type_name, 
+					 dataset_prefix=dataset_prefix, 
+					 verbose=True)
 
 	instance2 = MLSTM_FCN(verbose=True)
 	instance2.load_instance(instance1.save_filename)

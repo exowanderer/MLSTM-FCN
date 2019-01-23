@@ -22,3 +22,5 @@ logs*
 *egg*
 *.npy
 *.mat
+*weights*
+*WEASEL*

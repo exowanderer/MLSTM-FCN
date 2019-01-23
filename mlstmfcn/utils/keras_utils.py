@@ -23,6 +23,56 @@ from .generic_utils import load_dataset_at, calculate_dataset_metrics, cutoff_ch
                                 cutoff_sequence
 from .constants import MAX_NB_VARIABLES, MAX_TIMESTEPS_LIST
 
+from keras.callbacks import TensorBoard
+from time import time
+import os
+import tensorflow as tf
+
+class TrainValTensorboard(TensorBoard):
+    # Created from
+    #   https://stackoverflow.com/questions/47877475/
+    #   keras-tensorboard-plot-train-and-validation-scalars-in-a-same-figure
+    def __init__(self, log_dir='./logs', **kwargs):
+        
+        self.log_dir = log_dir
+
+        # Make the original `TensorBoard` log to a subdirectory 'training'
+        self.training_log_dir = os.path.join(self.log_dir, 'training')
+        super(TrainValTensorboard, self).__init__(self.training_log_dir, 
+                                                        **kwargs)
+
+        # Log the validation metrics to a separate subdirectory
+        self.val_log_dir = os.path.join(log_dir, 'validation')
+
+    def set_model(self, model):
+        self.val_writer = tf.summary.FileWriter(self.val_log_dir)
+        super(TrainValTensorboard, self).set_model(model)
+
+    def on_epoch_end(self, epoch, logs=None):
+        # Pop the validation logs and handle them separately with 
+        #   `self.val_writer`. Also rename the keys so that they can
+        #   be plotted on the same figure with the training metrics
+        logs = logs or {}
+        val_logs = {k.replace('val_', ''): v for k, v in logs.items() \
+                                                if k.startswith('val_')}
+
+        for name, value in val_logs.items():
+            summary = tf.Summary()
+            summary_value = summary.value.add()
+            summary_value.simple_value = value.item()
+            summary_value.tag = name
+            self.val_writer.add_summary(summary, epoch)
+
+        self.val_writer.flush()
+
+        # Pass the remaining logs to `Tensorboard.on_epoch_end`
+        logs = {k:v for k,v in logs.items() if not k.startswith('val_')}
+
+        super(TrainValTensorboard, self).on_epoch_end(epoch, logs)
+
+    def on_train_end(self, logs=None):
+        super(TrainValTensorboard, self).on_train_end(logs)
+        self.val_writer.close()
 
 def multi_label_log_loss(y_pred, y_true):
     return K.sum(K.binary_crossentropy(y_pred, y_true), axis=-1)
@@ -103,10 +153,13 @@ def _average_gradient_norm(model, X_train, y_train, batch_size):
 
 
 def train_model(model:Model, dataset_id, dataset_prefix, dataset_fold_id=None, epochs=50, batch_size=128, val_subset=None,
-                cutoff=None, normalize_timeseries=False, learning_rate=1e-3, monitor='loss', optimization_mode='auto', compile_model=True):
+                cutoff=None, normalize_timeseries=False, learning_rate=1e-3, monitor='loss', optimization_mode='auto', compile_model=True,
+                callbacks=None):
+    
     X_train, y_train, X_test, y_test, is_timeseries = load_dataset_at(dataset_id,
                                                                       fold_index=dataset_fold_id,
                                                                       normalize_timeseries=normalize_timeseries)
+    
     max_timesteps, max_nb_variables = calculate_dataset_metrics(X_train)
 
     if max_nb_variables != MAX_NB_VARIABLES[dataset_id]:
@@ -147,7 +200,14 @@ def train_model(model:Model, dataset_id, dataset_prefix, dataset_fold_id=None, e
                                        monitor=monitor, save_best_only=True, save_weights_only=True)
     reduce_lr = ReduceLROnPlateau(monitor=monitor, patience=100, mode=optimization_mode,
                                   factor=factor, cooldown=0, min_lr=1e-4, verbose=2)
-    callback_list = [model_checkpoint, reduce_lr]
+
+    logdir = './logs/log-{}'.format(int(time()))
+
+    tensorboard = TrainValTensorboard(log_dir=logdir,write_graph=False)
+
+    callback_list = [model_checkpoint, reduce_lr, tensorboard]
+
+    if callbacks is not None: callback_list.extend(callbacks)
 
     optm = Adam(lr=learning_rate)
 
